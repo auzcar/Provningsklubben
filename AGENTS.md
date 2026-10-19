@@ -5,7 +5,15 @@ Claude, Claude Code, ChatGPT/Codex, Gemini och Antigravity.
 
 ## Projektet
 - Webbsida för Provningsklubben. Koden påbörjades i ChatGPT Sites och förs över hit.
-- Teknikstack och mappstruktur: fylls i här när koden har lagts in.
+- Teknikstack: React 19, TypeScript, Vinext/Vite, Tailwind CSS, Cloudflare Workers/D1 och Drizzle.
+- Gränssnitt: `app/club.tsx`, styling: `app/globals.css`, API: `app/api/`.
+- Validering och blindning: `lib/model.ts`. Dryckeskategorier: `lib/drink-categories.ts`.
+- Schema: `db/`. Migrationer: `drizzle/`. Resurser: `public/` och `vendor/`.
+- `build/` innehåller underhållen källkod. Genererat byggresultat ligger i `dist/`.
+- Installation: Node.js 24 och pnpm 11.25.0, sedan `pnpm install --frozen-lockfile`.
+- Lokal databas: `pnpm db:migrate:local`. Utveckling: `pnpm dev`.
+- Kontroller: `pnpm test`, `pnpm typecheck` och `pnpm build`.
+- Data och exportbegränsningar: `docs/DATA.md` och `docs/VERIFICATION.md`.
 - Språk i sidans innehåll: svenska, om inget annat sägs.
 
 ## Arbetsregler
@@ -19,3 +27,14 @@ Claude, Claude Code, ChatGPT/Codex, Gemini och Antigravity.
 ## Håll det här aktuellt
 - Ändras teknikstack, mappstruktur eller byggkommandon: uppdatera avsnittet "Projektet" ovan.
 - `CLAUDE.md` och `GEMINI.md` pekar hit. Lägg ingen regel bara i dem.
+
+## Bevara funktion och data
+- Behåll design, API-kontrakt och arkitektur om uppgiften inte kräver annat.
+- Lägg till nya migrationer; ändra aldrig redan tillämpade migrationer.
+- Persondata och databasexporter hålls utanför Git. Privat återställningsunderlag levereras separat.
+- Bevara blindning, värdbehörighet, versionskontroll av utkast och låsta betyg efter avslöjande.
+- Avslöja först när alla anslutna deltagare betygsatt eller avstått på alla prov och antalet planerade deltagare har anslutit.
+- Ändra inte produktionsmiljö, databas eller autentisering utan uttryckligt godkännande.
+- Extern produktion kräver en verifierad autentiseringslösning. Lita aldrig på identitetshuvuden från klienten; lokal testinloggning är endast för utveckling på loopback.
+- Använd en separat worktree per aktiv agent. Kör kontrollerna ovan före pull request.
+- Profilsidor, profilbilder och separata historiska provningssidor finns inte i den exporterade versionen; beskriv dem inte som färdiga.
