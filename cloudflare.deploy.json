@@ -3,5 +3,8 @@
   "d1": {
     "database_name": "provningsklubben",
     "database_id": "cbac8374-d569-4841-8bb0-e9cd91704500"
+  },
+  "vars": {
+    "AUTH_MODE": "clerk"
   }
 }
