@@ -4,7 +4,7 @@ import {createDb,route} from './test-harness.mjs';
 const html='<script id="__NEXT_DATA__">'+fs.readFileSync('scripts/fixtures/product.json','utf8')+'</script>';
 const {GET}=await route('product',createDb());
 globalThis.fetch=async url=>String(url).includes('dryck-50901/')?new Response(html):new Response('',{status:404});
-let r=await GET(new Request('https://test.local/api/product?q=509',{headers:{'oai-authenticated-user-id':'host'}}));let d=await r.json();assert.equal(d.products.length,1);assert.equal(d.products[0].article,'50901');assert.equal(d.products[0].source,'Systembolagets produktsida');assert.equal(d.products[0].price,559);assert.equal(d.products[0].volume,70);assert.ok(d.products[0].aroma);assert.ok(d.products[0].productUrl.startsWith('https://www.systembolaget.se/'));
+let r=await GET(new Request('https://test.local/api/product?q=509',{headers:{'oai-authenticated-user-id':'host'}}));let d=await r.json();assert.equal(d.products.length,1);assert.equal(d.products[0].article,'50901');assert.equal(d.products[0].source,'Systembolagets produktsida');assert.equal(d.products[0].price,559);assert.equal(d.products[0].volume,70);assert.ok(d.products[0].aroma);assert.equal(d.products[0].image,'https://product-cdn.systembolaget.se/productimages/545196/545196_400.png');assert.ok(d.products[0].productUrl.startsWith('https://www.systembolaget.se/'));
 r=await GET(new Request('https://test.local/api/product?q=509'));assert.equal(r.status,401);
 r=await GET(new Request('https://test.local/api/product?q=https://example.com/50901/',{headers:{'oai-authenticated-user-id':'host'}}));assert.equal(r.status,400);
 console.log('PASS: official page fixture, exact article match, price/volume/aroma mapping, authenticated lookup, blocked foreign URL.');
