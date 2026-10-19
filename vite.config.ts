@@ -11,21 +11,28 @@ const SITE_CREATOR_PLACEHOLDER_DATABASE_ID =
 
 const { d1, r2 } = hostingConfig;
 
-// Own Cloudflare deployment (Workers Builds). Not secret: Worker name and D1 id.
-// Without this file, builds keep the Sites placeholder binding.
-const deploy: { name?: string; d1?: { database_name: string; database_id: string } } =
-  existsSync(new URL("./cloudflare.deploy.json", import.meta.url))
-    ? JSON.parse(readFileSync(new URL("./cloudflare.deploy.json", import.meta.url), "utf8"))
-    : {};
+// Own Cloudflare deployment (Workers Builds): Worker name, D1 database and
+// non-secret variables. Applied to builds only; `pnpm dev` keeps the local
+// placeholder database and the loopback test sign-in.
+type Deploy = {
+  name?: string;
+  d1?: { database_name: string; database_id: string };
+  vars?: Record<string, string>;
+};
+const deployFile = new URL("./cloudflare.deploy.json", import.meta.url);
+const deployConfig: Deploy = existsSync(deployFile)
+  ? JSON.parse(readFileSync(deployFile, "utf8"))
+  : {};
 
 // macOS Seatbelt blocks FSEvents, so Codex previews need polling for HMR.
 const isCodexSeatbeltSandbox = process.env.CODEX_SANDBOX === "seatbelt";
 const managedLinux = readExecutionProfile() === "managed-linux";
 
-const localBindingConfig = {
+const bindingConfig = (deploy: Deploy) => ({
   ...(deploy.name ? { name: deploy.name } : {}),
-  // Variables and secrets are set in the Cloudflare dashboard; deploys must not erase them.
+  // Other variables and secrets are set in the Cloudflare dashboard; deploys must not erase them.
   keep_vars: true,
+  ...(deploy.vars ? { vars: deploy.vars } : {}),
   main: "./build/sites-worker.ts",
   compatibility_flags: ["nodejs_compat"],
   d1_databases: d1
@@ -47,7 +54,7 @@ const localBindingConfig = {
         },
       ]
     : [],
-};
+});
 
 export default defineConfig(async ({ command }) => {
   // Use Miniflare's local Request.cf placeholder unless fetching is requested.
@@ -81,7 +88,7 @@ export default defineConfig(async ({ command }) => {
         viteEnvironment: { name: "rsc", childEnvironments: ["ssr"] },
         inspectorPort: false,
         config: {
-          ...localBindingConfig,
+          ...bindingConfig(command === "build" ? deployConfig : {}),
           ...(command === "serve"
             ? {
                 services: [

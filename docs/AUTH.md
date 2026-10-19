@@ -25,9 +25,9 @@
 
 ## Egen Cloudflare-produktion (inte gjord, kräver separat godkännande)
 
-1. Skapa en D1-databas och lägg dess namn och id i `cloudflare.deploy.json` (`{"name":"provningsklubben","d1":{"database_name":"…","database_id":"…"}}`, inte hemligt). Koppla repot i Cloudflare (Workers Builds) med byggkommandot `pnpm build` och deploy-kommandot `pnpm run deploy:cloudflare`, som först kör migrationerna i `drizzle/` mot databasen.
+1. `cloudflare.deploy.json` anger Worker-namn, D1-databas och `AUTH_MODE=clerk` (inget av det är hemligt). Inställningarna gäller bara `pnpm build`; `pnpm dev` använder fortfarande den lokala databasen och testinloggningen. Eftersom `AUTH_MODE=clerk` byggs in litar den driftsatta Workern aldrig på identitetshuvuden, inte ens innan nycklarna är inlagda. Koppla repot i Cloudflare (Workers Builds) med byggkommandot `pnpm build` och deploy-kommandot `pnpm run deploy:cloudflare`, som först kör migrationerna i `drizzle/` mot databasen.
 2. Skapa en Clerk-produktionsinstans för den egna domänen och lägg till DNS-posterna som Clerk anger.
-3. Sätt `AUTH_MODE=clerk`, `CLERK_PUBLISHABLE_KEY` och `ADMIN_EMAILS` som variabler och `CLERK_SECRET_KEY` som hemlighet (`wrangler secret put CLERK_SECRET_KEY`). Valfritt: `CLERK_JWT_KEY` för verifiering utan nätverksanrop.
+3. Sätt `CLERK_PUBLISHABLE_KEY` och `ADMIN_EMAILS` som variabler och `CLERK_SECRET_KEY` som hemlighet (`wrangler secret put CLERK_SECRET_KEY`). Valfritt: `CLERK_JWT_KEY` för verifiering utan nätverksanrop.
 4. Flytta data först efter en fullständig produktionsexport (se `docs/DATA.md`). Befintliga `tastings.owner` och `members.user` är Sites-användar-id och måste mappas till Clerk-id enligt en uttrycklig plan.
 
 Nycklar och hemligheter läggs aldrig i Git.
