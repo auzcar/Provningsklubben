@@ -39,3 +39,7 @@ Protect these exports with restricted permissions and encrypted storage. They in
 ## Independent Cloudflare database
 
 After provisioning your own database, use a separate deployment configuration with the actual account/database ID, obtain a restricted Cloudflare credential, and apply the unchanged migrations there. Cloudflare credentials for a new account do not grant access to the Work-managed database. Export/restore against remote production is a separate approved operation. A full production export and an authentication/user-ID migration are prerequisites for cutover.
+
+## Import into the own Cloudflare deployment
+
+Signed in as administrator, open Medlemmar → Importera historik and choose the private `recovery-data.json` (format 1) or `history.json`. The file goes straight to the app's D1 database via `/api/import` (`lib/import.ts`); it never passes through Git. Only missing rows are inserted (`INSERT OR IGNORE`), so a repeated import changes nothing. Sites user ids cannot sign in here, so imported tastings get the importing administrator as host. Afterwards, link archive names to members under Koppla arkivnamn.
