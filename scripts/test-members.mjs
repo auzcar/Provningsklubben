@@ -52,6 +52,22 @@ await call(avatar,'boss','/api/avatar?user=guest',undefined,404);
 list=await call(members,'boss','/api/members');assert.equal(list.members.find(m=>m.id==='guest').status,'removed');
 await call(members,'boss','/api/members',{action:'update',user:'guest',status:'active'});await call(club,'guest','/api/club');
 
+// Planning: participants are chosen among members, joined automatically, and share the cost.
+let plan=await call(club,'boss','/api/club',{action:'create',title:'Whiskykväll'});assert.deepEqual(plan.plan.participants,['boss']);
+plan=await call(club,'boss','/api/club',{action:'save',id:plan.id,version:plan.version,title:'Whiskykväll',date:'',plan:{...plan.plan,participants:['boss','guest','nobody'],samples:[{id:'w1',name:'Arran',price:549,number:1},{id:'w2',name:'Macallan',price:500,number:2}]}});
+assert.equal(plan.cost.total,1049);assert.equal(plan.cost.people,3);assert.equal(plan.cost.perPerson,350);
+assert.ok(!(await call(club,'guest','/api/club')).sessions.some(x=>x.id===plan.id));
+plan=await call(club,'boss','/api/club',{action:'start',id:plan.id});assert.equal(plan.joined,true);assert.equal(plan.people.length,2);assert.equal(plan.cost.perPerson,525);
+let mine=await call(club,'guest','/api/club?id='+plan.id);assert.equal(mine.joined,true);assert.equal(mine.cost.perPerson,525);assert.equal(mine.plan.samples[0].name,undefined);
+await call(club,'guest','/api/club',{action:'delete',id:plan.id},400);
+await call(club,'guest','/api/club',{action:'vote',id:plan.id,sample:'w1',vote:{score:8}});
+plan=await call(club,'boss','/api/club',{action:'remove-participant',id:plan.id,user:'guest'});assert.equal(plan.people.length,1);
+assert.equal(env.sqlite.prepare("SELECT COUNT(*) n FROM ratings WHERE session=?").get(plan.id).n,0);
+await call(club,'guest','/api/club?id='+plan.id,undefined,400);
+await call(club,'boss','/api/club',{action:'delete',id:plan.id});
+assert.equal(env.sqlite.prepare("SELECT COUNT(*) n FROM tastings WHERE id=?").get(plan.id).n,0);
+await call(club,'boss','/api/club',{action:'delete',id:t.id},400);
+
 // Admin import of the private Sites backup: inserts only missing rows, remaps tasting hosts.
 const backup={format:1,tables:{historical:[{id:'h2',data:JSON.stringify({id:'h2',title:'Ginkväll',date:'2021-01-23',samples:[{id:'g1',name:'Hendricks',type:'Gin',average:7,ratings:[{name:'Gäst',score:7}]}]})},{id:'h1',data:JSON.stringify({id:'h1',title:'Ändrad',samples:[]})}],tastings:[{id:'t-old',owner:'sites_user',status:'draft',title:'Nästa',date:'',data:JSON.stringify({theme:'',notes:'',budget:null,expected:[],samples:[]}),token:'tok',version:3}],members:[],ratings:[]}};
 await call(imp,'guest','/api/import',backup,403);
@@ -78,4 +94,4 @@ await call(club,null,'/api/club',undefined,401,{Authorization:'Bearer '+token({a
 await call(club,null,'/api/club',undefined,401,{Authorization:'Bearer '+token({exp:Math.floor(Date.now()/1000)-120})});
 await call(club,null,'/api/club',undefined,401,{Authorization:'Bearer '+token().slice(0,-4)+'AAAA'});
 await call(club,null,'/api/club',undefined,200,{Authorization:'Bearer '+token()});
-console.log('PASS: membership, admin rules, removal, profiles without premature disclosure, archive linking, avatar validation, backup import, Clerk token verification.');
+console.log('PASS: membership, admin rules, removal, profiles without premature disclosure, archive linking, avatar validation, participants, cost split, deletion, backup import, Clerk token verification.');

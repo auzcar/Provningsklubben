@@ -6,7 +6,7 @@ Claude, Claude Code, ChatGPT/Codex, Gemini och Antigravity.
 ## Projektet
 - Webbsida för Provningsklubben. Koden påbörjades i ChatGPT Sites och förs över hit.
 - Teknikstack: React 19, TypeScript, Vinext/Vite, Tailwind CSS, Cloudflare Workers/D1 och Drizzle.
-- Gränssnitt: `app/club.tsx`, styling: `app/globals.css`, API: `app/api/`.
+- Gränssnitt: `app/club.tsx` (provningsläget i `app/tasting-mode.tsx`), styling: `app/globals.css`, API: `app/api/`.
 - Validering och blindning: `lib/model.ts`. Dryckeskategorier: `lib/drink-categories.ts`.
 - Inloggning och medlemskap: `lib/auth.ts` (Clerk eller Sites-gateway, styrs av `AUTH_MODE`). Profiler: `lib/profiles.ts`, `app/profile.tsx`, `app/members.tsx`. Se `docs/AUTH.md`.
 - Schema: `db/`. Migrationer: `drizzle/`. Resurser: `public/` och `vendor/`.
