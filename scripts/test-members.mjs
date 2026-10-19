@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import {generateKeyPairSync,createSign} from 'node:crypto';
 import {createDb,route} from './test-harness.mjs';
 const env={...createDb(),ADMIN_EMAILS:'Boss@Club.test'};
-const club=await route('club',env),members=await route('members',env),profile=await route('profile',env),avatar=await route('avatar',env),session=await route('session',env),history=await route('history',env);
+const imp=await route('import',env),club=await route('club',env),members=await route('members',env),profile=await route('profile',env),avatar=await route('avatar',env),session=await route('session',env),history=await route('history',env);
 const headers=(user,extra={})=>({...(user?{'oai-authenticated-user-id':user,'oai-authenticated-user-email':user+'@club.test'}:{}),'Content-Type':'application/json','Origin':'https://test.local',...extra});
 const call=async(handler,user,path,body,status=200,extra)=>{const r=await handler[body?'POST':'GET'](new Request('https://test.local'+path,{method:body?'POST':'GET',headers:headers(user,extra),...(body?{body:JSON.stringify(body)}:{})}));const d=r.headers.get('content-type')?.includes('json')?await r.json():r;assert.equal(r.status,status,JSON.stringify(d));return d;};
 
@@ -52,6 +52,17 @@ await call(avatar,'boss','/api/avatar?user=guest',undefined,404);
 list=await call(members,'boss','/api/members');assert.equal(list.members.find(m=>m.id==='guest').status,'removed');
 await call(members,'boss','/api/members',{action:'update',user:'guest',status:'active'});await call(club,'guest','/api/club');
 
+// Admin import of the private Sites backup: inserts only missing rows, remaps tasting hosts.
+const backup={format:1,tables:{historical:[{id:'h2',data:JSON.stringify({id:'h2',title:'Ginkväll',date:'2021-01-23',samples:[{id:'g1',name:'Hendricks',type:'Gin',average:7,ratings:[{name:'Gäst',score:7}]}]})},{id:'h1',data:JSON.stringify({id:'h1',title:'Ändrad',samples:[]})}],tastings:[{id:'t-old',owner:'sites_user',status:'draft',title:'Nästa',date:'',data:JSON.stringify({theme:'',notes:'',budget:null,expected:[],samples:[]}),token:'tok',version:3}],members:[],ratings:[]}};
+await call(imp,'guest','/api/import',backup,403);
+await call(imp,'boss','/api/import',{format:2},400);
+let res=await call(imp,'boss','/api/import',backup);assert.equal(res.historical,1);assert.equal(res.tastings,1);assert.deepEqual(res.total,{historical:2,samples:1,ratings:1});
+assert.equal(JSON.parse(env.sqlite.prepare("SELECT data FROM historical WHERE id='h1'").get().data).title,'Gammal ölkväll');
+res=await call(imp,'boss','/api/import',backup);assert.equal(res.historical,0);assert.equal(res.tastings,0);
+assert.equal((await call(club,'boss','/api/club?id=t-old')).host,true);
+res=await call(imp,'boss','/api/import',[JSON.parse(backup.tables.historical[0].data)]);assert.equal(res.historical,0);
+assert.equal((await call(history,'guest','/api/history')).sessions.filter(x=>x.title==='Ginkväll').length,1);
+
 // Clerk mode: identity headers are ignored; only a valid session token for this origin counts.
 const {privateKey,publicKey}=generateKeyPairSync('rsa',{modulusLength:2048});
 const jwtKey=publicKey.export({type:'spki',format:'pem'}).toString();
@@ -67,4 +78,4 @@ await call(club,null,'/api/club',undefined,401,{Authorization:'Bearer '+token({a
 await call(club,null,'/api/club',undefined,401,{Authorization:'Bearer '+token({exp:Math.floor(Date.now()/1000)-120})});
 await call(club,null,'/api/club',undefined,401,{Authorization:'Bearer '+token().slice(0,-4)+'AAAA'});
 await call(club,null,'/api/club',undefined,200,{Authorization:'Bearer '+token()});
-console.log('PASS: membership, admin rules, removal, profiles without premature disclosure, archive linking, avatar validation, Clerk token verification.');
+console.log('PASS: membership, admin rules, removal, profiles without premature disclosure, archive linking, avatar validation, backup import, Clerk token verification.');
