@@ -1,6 +1,7 @@
 'use client';
 import {Trophy,Flame,Handshake,PiggyBank,Target,Heart,Gavel,Sparkles,ArrowUpRight} from 'lucide-react';
 import {productImage,systembolagetUrl} from '@/lib/model';
+import SbLink from './sb-link';
 
 const fmt=(n:any,d=1)=>n==null?'–':Number(n).toLocaleString('sv-SE',{minimumFractionDigits:d,maximumFractionDigits:d});
 const kr=(n:any)=>n==null?'–':Math.round(n).toLocaleString('sv-SE')+' kr';
@@ -42,7 +43,7 @@ export default function Results({current}:{current:any}){
   <div className="results-intro"><div className="eyebrow">NU VET VI VAD SOM FANNS I GLASEN</div><h2>Kvällens resultat</h2><p>Betygen är låsta. Dags att diskutera.</p></div>
   {scored.length>0&&<section className="podium" aria-label="Prispall">{podium.map((r:any)=>r&&<div key={r.id} className={'podium-step p'+r.place}>
    {r.image?<img src={productImage(r.image)} alt="" onError={e=>{e.currentTarget.style.display='none';}}/>:<Trophy size={r.place===1?34:26}/>}
-   <strong>{r.name}</strong><span className="podium-score">{fmt(r.average)}</span>
+   <strong>{r.name} <SbLink drink={r}/></strong><span className="podium-score">{fmt(r.average)}</span>
    <div className="podium-block"><b>{r.place}</b><small>Prov {r.number}</small></div>
   </div>)}</section>}
   {awards.length>0&&<section className="awards"><h3>Kvällens utmärkelser</h3><div className="award-grid">{awards.map(a=><article className="award" key={a.title}><a.icon size={20}/><div><span>{a.title}</span><strong>{a.who}</strong><p>{a.text}</p></div></article>)}</div></section>}
