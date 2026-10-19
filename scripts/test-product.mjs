@@ -7,4 +7,9 @@ globalThis.fetch=async url=>String(url).includes('dryck-50901/')?new Response(ht
 let r=await GET(new Request('https://test.local/api/product?q=509',{headers:{'oai-authenticated-user-id':'host'}}));let d=await r.json();assert.equal(d.products.length,1);assert.equal(d.products[0].article,'50901');assert.equal(d.products[0].source,'Systembolagets produktsida');assert.equal(d.products[0].price,559);assert.equal(d.products[0].volume,70);assert.ok(d.products[0].aroma);assert.equal(d.products[0].image,'https://product-cdn.systembolaget.se/productimages/545196/545196_400.png');assert.ok(d.products[0].productUrl.startsWith('https://www.systembolaget.se/'));
 r=await GET(new Request('https://test.local/api/product?q=509'));assert.equal(r.status,401);
 r=await GET(new Request('https://test.local/api/product?q=https://example.com/50901/',{headers:{'oai-authenticated-user-id':'host'}}));assert.equal(r.status,400);
-console.log('PASS: official page fixture, exact article match, price/volume/aroma mapping, authenticated lookup, blocked foreign URL.');
+const model=await import('../.sites-runtime/tests/lib/model.mjs');
+assert.equal(model.systembolagetUrl({productUrl:'https://www.systembolaget.se/produkt/sprit/x-50901/',article:'50901'}),'https://www.systembolaget.se/produkt/sprit/x-50901/');
+assert.equal(model.systembolagetUrl({productUrl:'https://evil.test/',article:'226',name:'Fransac XO'}),'https://www.systembolaget.se/sok/?textQuery=226');
+assert.equal(model.systembolagetUrl({name:'Arran 10'}),'https://www.systembolaget.se/sok/?textQuery=Arran%2010');
+assert.equal(model.systembolagetUrl({name:''}),'');
+console.log('PASS: Systembolaget links, official page fixture, exact article match, price/volume/aroma mapping, authenticated lookup, blocked foreign URL.');
