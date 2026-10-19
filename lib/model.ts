@@ -15,4 +15,11 @@ export function costShare(samples:Sample[],people:number){const total=samples.re
 export function validateVote(v:any):Vote{const score=v?.skip?null:Number(v?.score);if(!v?.skip&&(v?.score==null||v?.score===''||!Number.isFinite(score)||score!<0||score!>10))throw Error('Ange ett betyg mellan 0 och 10.');return {score,skip:!!v.skip,comment:String(v.comment||'').slice(0,2000)};}
 // Systembolaget returns image urls without size or extension; the files are served as <url>_400.png.
 export function productImage(url?:string){if(!url)return '';return /\.(png|jpe?g|webp)(\?|$)/i.test(url)?url:url+'_400.png';}
+// Link to Systembolaget: the saved product page, else a search on article number or name.
+// A plain https link lets the Systembolaget app take over where the phone supports it.
+export function systembolagetUrl(p:{productUrl?:string;article?:string;name?:string}){
+ if(p.productUrl?.startsWith('https://www.systembolaget.se/'))return p.productUrl;
+ const q=String(p.article||'').trim()||String(p.name||'').trim();
+ return q?'https://www.systembolaget.se/sok/?textQuery='+encodeURIComponent(q):'';
+}
 export function visibleSamples(samples:Sample[],host:boolean,revealed:boolean){return host||revealed?samples:samples.map(s=>({id:s.id,number:s.number}));}
