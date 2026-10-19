@@ -1,8 +1,8 @@
 import {env} from 'cloudflare:workers';
 import {validatePlan,validateVote,visibleSamples} from '@/lib/model';
+import {requireMember,reply,fail,sameOrigin} from '@/lib/auth';
 export const dynamic='force-dynamic';
-function reply(data:any,status=200){return Response.json(data,{status,headers:{'Cache-Control':'no-store'}})}
-function uid(r:Request){const u=r.headers.get('oai-authenticated-user-id');if(!u)throw Error('Logga in för att använda klubben.');return u;}
+const uid=async(r:Request)=>(await requireMember(r,env)).id;
 const db=()=>{if(!env.DB)throw Error('Databasen är inte tillgänglig.');return env.DB;};
 async function detail(id:string,user:string){
  const s:any=await db().prepare('SELECT * FROM tastings WHERE id=?').bind(id).first();if(!s)throw Error('Provningen finns inte.');
@@ -13,10 +13,10 @@ async function detail(id:string,user:string){
  const all=s.status==='revealed'?(await db().prepare('SELECT r.sample,r.data,m.name FROM ratings r JOIN members m ON r.session=m.session AND r.user=m.user WHERE r.session=?').bind(id).all()).results:[];
  return {id:s.id,title:s.title,date:s.date,status:s.status,version:s.version,host,joined:!!member,token:host?s.token:undefined,plan:host?plan:{theme:plan.theme,samples:visibleSamples(plan.samples,false,s.status==='revealed')},people,progress,mine:Object.fromEntries(mine.map((v:any)=>[v.sample,JSON.parse(v.data)])),results:all.map((v:any)=>({...JSON.parse(v.data),sample:v.sample,name:v.name}))};
 }
-export async function GET(r:Request){try{const user=uid(r);const id=new URL(r.url).searchParams.get('id');if(id)return reply(await detail(id,user));const rows=(await db().prepare('SELECT DISTINCT t.id,t.title,t.date,t.status,t.owner FROM tastings t LEFT JOIN members m ON t.id=m.session WHERE t.owner=? OR m.user=? ORDER BY t.date DESC').bind(user,user).all()).results;return reply({user,sessions:rows.map((s:any)=>({...s,host:s.owner===user,owner:undefined}))});}catch(e:any){return reply({error:e.message},400)}}
+export async function GET(r:Request){try{const user=await uid(r);const id=new URL(r.url).searchParams.get('id');if(id)return reply(await detail(id,user));const rows=(await db().prepare('SELECT DISTINCT t.id,t.title,t.date,t.status,t.owner FROM tastings t LEFT JOIN members m ON t.id=m.session WHERE t.owner=? OR m.user=? ORDER BY t.date DESC').bind(user,user).all()).results;return reply({user,sessions:rows.map((s:any)=>({...s,host:s.owner===user,owner:undefined}))});}catch(e:any){return fail(e)}}
 export async function POST(r:Request){try{
- const origin=r.headers.get('origin');if(origin&&origin!==new URL(r.url).origin)return reply({error:'Ogiltig begäran.'},403);
- const user=uid(r);const b:any=await r.json();let id=b.id;
+ if(!sameOrigin(r))return reply({error:'Ogiltig begäran.'},403);
+ const user=await uid(r);const b:any=await r.json();let id=b.id;
  if(b.action==='create'){
  id=crypto.randomUUID();const plan={theme:'',notes:'',budget:null,expected:[],samples:[]};
  await db().prepare('INSERT INTO tastings(id,owner,status,title,date,data,token,version) VALUES(?,?,?,?,?,?,?,1)').bind(id,user,'draft',String(b.title||'Ny provning').slice(0,150),'',JSON.stringify(plan),crypto.randomUUID()+crypto.randomUUID()).run();return reply(await detail(id,user));}
@@ -43,4 +43,4 @@ export async function POST(r:Request){try{
  const out=await db().prepare("UPDATE tastings SET status='revealed',version=version+1 WHERE id=? AND status='active' AND EXISTS(SELECT 1 FROM members WHERE session=?) AND NOT EXISTS(SELECT 1 FROM members m WHERE m.session=? AND (SELECT COUNT(*) FROM ratings r WHERE r.session=m.session AND r.user=m.user) < ?)").bind(id,id,id,plan.samples.length).run();if(!out.meta.changes)throw Error('Alla anslutna deltagare måste betygsätta eller avstå på samtliga prov först.');
  }else throw Error('Okänd åtgärd.');
  return reply(await detail(id,user));
- }catch(e:any){return reply({error:e.message},400)}}
+ }catch(e:any){return fail(e)}}

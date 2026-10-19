@@ -1,2 +1,2 @@
-import Club from './club';
-export default function Home(){return <Club/>}
+import AuthGate from './auth-gate';
+export default function Home(){return <AuthGate/>}

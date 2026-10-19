@@ -6,7 +6,7 @@ Export of the existing Sites application, not a reimplementation. Baseline: sour
 
 Host planning, budget and shopping status; blind tasting with individual mobile ratings; server-side reveal gating; searchable history with drink categories and beer subgroups; Systembolaget article lookup with fallback and manual entry. React 19 + TypeScript, Vinext/Vite with Next-compatible routing, Tailwind CSS, Cloudflare Workers and SQLite-compatible D1. Drizzle owns schema/migrations. Existing UI and business logic are retained.
 
-The recovered version has no persistent participant profile pages, avatar uploads or dedicated historical tasting pages. These were requested in conversation but do not exist in this source version or database schema. Do not treat planned features as exported features.
+The exported version had no profile pages or avatar uploads. They are added on top of the export, together with invite-only Clerk sign-in and server-side membership checks; see [docs/AUTH.md](docs/AUTH.md). They are not in production. Dedicated historical tasting pages still do not exist.
 
 ## Ubuntu setup
 
@@ -26,7 +26,7 @@ The existing repository is the source of truth. This export is prepared on `code
 
 Open `http://localhost:5173`. The existing development-only sign-in route `/signin-with-chatgpt?return_to=/` creates the local test user. It works only on loopback and does not use a Work account. This is not production authentication or a multi-user mobile deployment. Local D1 data persists in ignored `.wrangler/state/`.
 
-No application secret is needed for local development. `.env.example` documents optional runtime switches. The `DB` binding is configured in `wrangler.local.json` and `vite.config.ts`, not via a database connection URL. Product lookup uses public HTTP sources without an API key. Connector infrastructure is retained from the original starter but this application does not require a connected app at runtime.
+Copy `.dev.vars.example` to `.dev.vars` to make the local test user an administrator, or to test Clerk sign-in with a development instance. No application secret is needed for the default local sign-in. `.env.example` documents optional runtime switches. The `DB` binding is configured in `wrangler.local.json` and `vite.config.ts`, not via a database connection URL. Product lookup uses public HTTP sources without an API key. Connector infrastructure is retained from the original starter but this application does not require a connected app at runtime.
 
 ## Data
 

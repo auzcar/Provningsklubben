@@ -1,17 +1,8 @@
-import {DatabaseSync} from 'node:sqlite';
 import fs from 'node:fs';
-import ts from 'typescript';
 import assert from 'node:assert/strict';
-const db=new DatabaseSync(':memory:');
-for(const file of fs.readdirSync('drizzle').filter(x=>x.endsWith('.sql')).sort())db.exec(fs.readFileSync('drizzle/'+file,'utf8'));
-class Statement{constructor(sql,params=[]){this.sql=sql;this.params=params;}bind(...params){return new Statement(this.sql,params)}async first(){return db.prepare(this.sql).get(...this.params)||null}async all(){return {results:db.prepare(this.sql).all(...this.params)}}async run(){const r=db.prepare(this.sql).run(...this.params);return {meta:{changes:Number(r.changes)}}}}
-globalThis.testEnv={DB:{prepare:s=>new Statement(s),batch:async a=>Promise.all(a.map(s=>s.run()))}};
-fs.mkdirSync('.sites-runtime/tests',{recursive:true});
-const compile=(s)=>ts.transpileModule(s,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText;
-fs.writeFileSync('.sites-runtime/tests/model.mjs',compile(fs.readFileSync('lib/model.ts','utf8')));
-let code=fs.readFileSync('app/api/club/route.ts','utf8').replace("import {env} from 'cloudflare:workers';","const env=globalThis.testEnv;").replace("'@/lib/model'","'./model.mjs'");
-fs.writeFileSync('.sites-runtime/tests/route.mjs',compile(code));
-const {GET,POST}=await import('../.sites-runtime/tests/route.mjs');
+import {createDb,route} from './test-harness.mjs';
+const env=createDb();
+const {GET,POST}=await route('club',env);
 const req=(user,body,id)=>new Request('https://test.local/api/club'+(id?'?id='+id:''),{method:body?'POST':'GET',headers:{...(user?{'oai-authenticated-user-id':user}:{}),'Content-Type':'application/json','Origin':'https://test.local'},...(body?{body:JSON.stringify(body)}:{})});
 async function post(user,body,ok=true){const r=await POST(req(user,body));const d=await r.json();assert.equal(r.ok,ok,JSON.stringify(d));return d}
 async function get(user,id,ok=true){const r=await GET(req(user,null,id));const d=await r.json();assert.equal(r.ok,ok,JSON.stringify(d));return d}

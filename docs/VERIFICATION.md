@@ -31,3 +31,9 @@ The Git candidate retains the frontend, API handlers, styles, components, public
 - Profiles, avatar uploads and individual historical tasting pages are absent from the recovered implementation.
 
 Do not claim a complete migration or production cutover based on these checks. The running original remains the production system.
+
+# Inloggning, medlemmar och profiler, 2026-10-19
+
+Verifierat lokalt: `pnpm test` (inklusive `scripts/test-members.mjs`), `pnpm typecheck`, `pnpm build` och migrationen `0002` mot en tom lokal D1. Testerna täcker Clerk-tokenverifiering med lokalt signerade nycklar (giltig token, fel ursprung, utgången och manipulerad token, ignorerade identitetshuvuden), administratörsregler, inaktivering, att profiler inte visar betyg före avslöjande, koppling av arkivnamn och validering av profilbilder. Gränssnittet för profil och medlemmar provkördes i Chromium på desktop och mobil med den lokala testinloggningen.
+
+Inte verifierat: inloggning mot en riktig Clerk-instans (inga nycklar finns i projektet), Clerks inbjudningsmejl och registrering via inbjudningslänk, samt drift i egen Cloudflare-miljö.

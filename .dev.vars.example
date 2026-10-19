@@ -1,0 +1,9 @@
+# Copy to .dev.vars for local Worker variables. Never commit .dev.vars.
+# Default: the loopback-only test sign-in (/signin-with-chatgpt). Its user is seedy@sites.test.
+ADMIN_EMAILS=seedy@sites.test
+
+# To test Clerk locally, use a Clerk *development* instance:
+# AUTH_MODE=clerk
+# CLERK_PUBLISHABLE_KEY=pk_test_...
+# CLERK_SECRET_KEY=sk_test_...
+# ADMIN_EMAILS=din.adress@example.se

@@ -1,6 +1,8 @@
+import {env} from 'cloudflare:workers';
+import {requireMember,fail} from '@/lib/auth';
 export const dynamic='force-dynamic';
 export async function GET(r:Request){
- if(!r.headers.get('oai-authenticated-user-id'))return Response.json({error:'Logga in först.'},{status:401});
+ try{await requireMember(r,env);}catch(e){return fail(e)}
  let q=new URL(r.url).searchParams.get('q')?.trim()||'';
  if(q.startsWith('https://')){try{const u=new URL(q);if(u.hostname!=='www.systembolaget.se'&&u.hostname!=='systembolaget.se')throw Error();q=u.pathname.match(/-(\d+)\/?$/)?.[1]||'';}catch{q='';}}
  if(!/^\d{1,9}$/.test(q))return Response.json({error:'Ange artikelnummer eller en produktlänk från Systembolaget.'},{status:400});

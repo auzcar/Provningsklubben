@@ -8,6 +8,7 @@ Claude, Claude Code, ChatGPT/Codex, Gemini och Antigravity.
 - Teknikstack: React 19, TypeScript, Vinext/Vite, Tailwind CSS, Cloudflare Workers/D1 och Drizzle.
 - Gränssnitt: `app/club.tsx`, styling: `app/globals.css`, API: `app/api/`.
 - Validering och blindning: `lib/model.ts`. Dryckeskategorier: `lib/drink-categories.ts`.
+- Inloggning och medlemskap: `lib/auth.ts` (Clerk eller Sites-gateway, styrs av `AUTH_MODE`). Profiler: `lib/profiles.ts`, `app/profile.tsx`, `app/members.tsx`. Se `docs/AUTH.md`.
 - Schema: `db/`. Migrationer: `drizzle/`. Resurser: `public/` och `vendor/`.
 - `build/` innehåller underhållen källkod. Genererat byggresultat ligger i `dist/`.
 - Installation: Node.js 24 och pnpm 11.25.0, sedan `pnpm install --frozen-lockfile`.
@@ -37,4 +38,4 @@ Claude, Claude Code, ChatGPT/Codex, Gemini och Antigravity.
 - Ändra inte produktionsmiljö, databas eller autentisering utan uttryckligt godkännande.
 - Extern produktion kräver en verifierad autentiseringslösning. Lita aldrig på identitetshuvuden från klienten; lokal testinloggning är endast för utveckling på loopback.
 - Använd en separat worktree per aktiv agent. Kör kontrollerna ovan före pull request.
-- Profilsidor, profilbilder och separata historiska provningssidor finns inte i den exporterade versionen; beskriv dem inte som färdiga.
+- Profilsidor, profilbilder och Clerk-inloggning finns i koden men är inte i produktion. Separata historiska provningssidor finns inte; beskriv dem inte som färdiga.

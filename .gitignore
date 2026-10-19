@@ -69,3 +69,4 @@ next-env.d.ts
 /source-metadata.json
 /lib/history.json
 /.dev.vars*
+!/.dev.vars.example
