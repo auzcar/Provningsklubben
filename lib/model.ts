@@ -1,6 +1,8 @@
 export type Sample={id:string;name:string;article:string;type:string;price:number|null;volume:number|null;abv:number|null;number:number;purchased:boolean;serving:string;image?:string;taste?:string;country?:string;vintage?:string;source?:string;fetchedAt?:string;producer?:string;aroma?:string;color?:string;grapes?:string;sugar?:number|null;productUrl?:string};
 export type Plan={theme:string;notes:string;budget:number|null;expected:string[];participants:string[];samples:Sample[]};
-export type Vote={score:number|null;skip:boolean;comment:string};
+export type Vote={score:number|null;skip:boolean;comment:string;tags?:string[];guess?:number|null};
+// Quick tasting words shown as chips in tasting mode; counted at the reveal.
+export const TASTE_TAGS=['Fruktig','Rökig','Söt','Torr','Kryddig','Syrlig','Bitter','Blommig','Nötig','Ekig','Citrus','Mjuk'];
 export function validatePlan(p:any):Plan{
  if(!p||!Array.isArray(p.samples)||p.samples.length>50)throw Error('Högst 50 drycker per provning.');
  const text=(x:any,n=2000)=>String(x??'').slice(0,n);
@@ -12,7 +14,10 @@ export function validatePlan(p:any):Plan{
 // Even split of the known bottle prices, rounded up to whole kronor.
 export function costShare(samples:Sample[],people:number){const total=samples.reduce((n,s)=>n+(Number(s.price)||0),0);return {total,people,perPerson:people>0?Math.ceil(total/people):null};
 }
-export function validateVote(v:any):Vote{const score=v?.skip?null:Number(v?.score);if(!v?.skip&&(v?.score==null||v?.score===''||!Number.isFinite(score)||score!<0||score!>10))throw Error('Ange ett betyg mellan 0 och 10.');return {score,skip:!!v.skip,comment:String(v.comment||'').slice(0,2000)};}
+export function validateVote(v:any):Vote{const score=v?.skip?null:Number(v?.score);if(!v?.skip&&(v?.score==null||v?.score===''||!Number.isFinite(score)||score!<0||score!>10))throw Error('Ange ett betyg mellan 0 och 10.');
+ const tags=Array.isArray(v.tags)?[...new Set<string>(v.tags.filter((t:any)=>TASTE_TAGS.includes(t)))]:[];
+ const g=v.guess==null||v.guess===''?null:Number(v.guess);if(g!==null&&(!Number.isFinite(g)||g<0||g>100000))throw Error('Prisgissningen måste vara ett belopp i kronor.');
+ return {score,skip:!!v.skip,comment:String(v.comment||'').slice(0,2000),tags,guess:g===null?null:Math.round(g)};}
 // Systembolaget returns image urls without size or extension; the files are served as <url>_400.png.
 export function productImage(url?:string){if(!url)return '';return /\.(png|jpe?g|webp)(\?|$)/i.test(url)?url:url+'_400.png';}
 // Link to Systembolaget: the saved product page, else a search on article number or name.
