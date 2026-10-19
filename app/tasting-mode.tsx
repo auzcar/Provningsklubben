@@ -54,7 +54,7 @@ export default function TastingMode({current,onExit,onReveal,canReveal,revealHin
 
   <section className="tm-table" aria-label="Vid bordet">
    {people.map(p=>{const n=progress(p.user),pct=Math.round(n/Math.max(1,samples.length)*100);return <div className="tm-guest" key={p.user} title={`${p.name}: ${n} av ${samples.length}`}>
-    <span className="tm-ring" style={{background:`conic-gradient(#c49a4a ${pct}%, #4a1f27 0)`}}><Avatar user={p.user} version={avatars[p.user]||0} name={p.name} size={34}/></span>
+    <span className="tm-ring" style={{background:`conic-gradient(var(--brass) ${pct}%, var(--ring-rest) 0)`}}><Avatar user={p.user} version={avatars[p.user]||0} name={p.name} size={34}/></span>
     <small>{p.user===current.self?'Du':p.name.split(' ')[0]}</small>
    </div>;})}
   </section>

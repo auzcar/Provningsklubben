@@ -3,6 +3,7 @@ import {useEffect,useState} from 'react';
 import {Trophy,Frown,Flame,PiggyBank,Users,Heart,Gavel,Sparkles,Star,Coins,MessageSquareQuote} from 'lucide-react';
 import {api} from '@/lib/client-api';
 import {categoryOrder} from '@/lib/drink-categories';
+import SbLink from './sb-link';
 
 const fmt=(n:any,d=1)=>n==null||!Number.isFinite(n)?'–':Number(n).toLocaleString('sv-SE',{minimumFractionDigits:d,maximumFractionDigits:d});
 const kr=(n:number)=>Math.round(n).toLocaleString('sv-SE')+' kr';
@@ -66,10 +67,10 @@ export default function Stats({archive}:{archive:any}){
     <div className="bar-chart" role="table" aria-label="Drycker per kategori">{byCat.map(c=><div className="bar-row" role="row" key={c.c} title={`${c.c}: ${c.count} drycker, snittbetyg ${fmt(c.avg)}`}><span role="cell" className="bar-label">{c.c}</span><span role="cell" className="bar-track"><span className="bar" style={{width:`${c.count/maxCat*100}%`}}/></span><span role="cell" className="bar-value">{c.count}</span><span role="cell" className="bar-avg">{fmt(c.avg)}</span></div>)}</div>
    </section>
 
-   <section className="stat-card"><h2><Trophy size={20}/>Hall of fame</h2><ol className="fact-list">{top.map((d:any)=><li key={d.id}><span><b>{d.name}</b><small>{d.session}</small></span><em>{fmt(d.avg)}</em></li>)}</ol></section>
-   <section className="stat-card"><h2><Frown size={20}/>Sorgebarnen</h2><ol className="fact-list">{bottom.map((d:any)=><li key={d.id}><span><b>{d.name}</b><small>{d.session}</small></span><em>{fmt(d.avg)}</em></li>)}</ol></section>
-   <section className="stat-card"><h2><Flame size={20}/>Mest omstridda</h2><ol className="fact-list">{contested.map((d:any)=><li key={d.id}><span><b>{d.name}</b><small>Från {fmt(Math.min(...d.scores))} till {fmt(Math.max(...d.scores))}</small></span><em>{fmt(d.spread)}</em></li>)}</ol></section>
-   <section className="stat-card"><h2><PiggyBank size={20}/>Fynden</h2><p className="muted">Flest poäng per hundralapp, flaskor från 50 kr.</p><ol className="fact-list">{bargains.map((d:any)=><li key={d.id}><span><b>{d.name}</b><small>{kr(d.price)} · snitt {fmt(d.avg)}</small></span><em>{fmt(d.value,2)}<small> p/100 kr</small></em></li>)}</ol></section>
+   <section className="stat-card"><h2><Trophy size={20}/>Hall of fame</h2><ol className="fact-list">{top.map((d:any)=><li key={d.id}><span><b>{d.name} <SbLink drink={d}/></b><small>{d.session}</small></span><em>{fmt(d.avg)}</em></li>)}</ol></section>
+   <section className="stat-card"><h2><Frown size={20}/>Sorgebarnen</h2><ol className="fact-list">{bottom.map((d:any)=><li key={d.id}><span><b>{d.name} <SbLink drink={d}/></b><small>{d.session}</small></span><em>{fmt(d.avg)}</em></li>)}</ol></section>
+   <section className="stat-card"><h2><Flame size={20}/>Mest omstridda</h2><ol className="fact-list">{contested.map((d:any)=><li key={d.id}><span><b>{d.name} <SbLink drink={d}/></b><small>Från {fmt(Math.min(...d.scores))} till {fmt(Math.max(...d.scores))}</small></span><em>{fmt(d.spread)}</em></li>)}</ol></section>
+   <section className="stat-card"><h2><PiggyBank size={20}/>Fynden</h2><p className="muted">Flest poäng per hundralapp, flaskor från 50 kr.</p><ol className="fact-list">{bargains.map((d:any)=><li key={d.id}><span><b>{d.name} <SbLink drink={d}/></b><small>{kr(d.price)} · snitt {fmt(d.avg)}</small></span><em>{fmt(d.value,2)}<small> p/100 kr</small></em></li>)}</ol></section>
 
    <section className="stat-card wide"><h2><Coins size={20}/>Är dyrare godare?</h2>
     <p className="big-claim">{corr==null?'För lite prisdata ännu.':Math.abs(corr)<0.15?<>Nej, knappt alls. Sambandet mellan pris och betyg är <b>{fmt(corr,2)}</b>.</>:corr>0?<>Lite grann. Sambandet mellan pris och betyg är <b>{fmt(corr,2)}</b>.</>:<>Tvärtom! Sambandet mellan pris och betyg är <b>{fmt(corr,2)}</b>.</>}</p>

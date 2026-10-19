@@ -17,13 +17,13 @@ export async function profileData(db:D1Database,id:string,viewer:Member,adminEma
  const tastings=[];
  for(const t of joined.filter(t=>t.status==='revealed')){
   const votes=(await db.prepare('SELECT user,sample,data FROM ratings WHERE session=?').bind(t.id).all()).results.map((v:any)=>({...v,...JSON.parse(v.data)}));
-  const samples=JSON.parse(t.data).samples.map((p:any)=>{const mine=votes.find((v:any)=>v.sample===p.id&&v.user===id);return {id:p.id,number:p.number,name:p.name,type:p.type,serving:p.serving,...drinkCategory({...p,session:t.title,sessionId:t.id}),score:mine?.score??null,skip:!!mine?.skip,comment:mine?.comment||'',rated:!!mine,average:average(votes.filter((v:any)=>v.sample===p.id&&v.score!=null).map((v:any)=>v.score))};});
+  const samples=JSON.parse(t.data).samples.map((p:any)=>{const mine=votes.find((v:any)=>v.sample===p.id&&v.user===id);return {id:p.id,number:p.number,name:p.name,type:p.type,serving:p.serving,article:p.article||'',productUrl:p.productUrl||'',...drinkCategory({...p,session:t.title,sessionId:t.id}),score:mine?.score??null,skip:!!mine?.skip,comment:mine?.comment||'',rated:!!mine,average:average(votes.filter((v:any)=>v.sample===p.id&&v.score!=null).map((v:any)=>v.score))};});
   tastings.push({id:t.id,title:t.title,date:t.date,source:'app',host:t.owner===id,samples});
  }
  const aliases=names(row.history_names);
  if(aliases.length){
   for(const h of (await db.prepare('SELECT data FROM historical').all()).results.map((r:any)=>JSON.parse(r.data))){
-   const samples=h.samples.map((p:any)=>{const mine=(p.ratings||[]).find((v:any)=>aliases.includes(v.name));return mine&&{id:p.id,number:p.number,name:p.name,type:p.type,serving:p.serving,...drinkCategory({...p,session:h.title,sessionId:h.id}),score:mine.score??null,skip:!!mine.skip,comment:mine.comment||'',rated:true,average:p.average??null};}).filter(Boolean);
+   const samples=h.samples.map((p:any)=>{const mine=(p.ratings||[]).find((v:any)=>aliases.includes(v.name));return mine&&{id:p.id,number:p.number,name:p.name,type:p.type,serving:p.serving,article:p.article||'',productUrl:p.productUrl||'',...drinkCategory({...p,session:h.title,sessionId:h.id}),score:mine.score??null,skip:!!mine.skip,comment:mine.comment||'',rated:true,average:p.average??null};}).filter(Boolean);
    if(samples.length)tastings.push({id:h.id,title:h.title,date:h.date||'',source:'archive',host:false,samples});
   }
  }
