@@ -4,3 +4,7 @@ export const members=sqliteTable('members',{session:text('session').notNull(),us
 export const ratings=sqliteTable('ratings',{session:text('session').notNull(),user:text('user').notNull(),sample:text('sample').notNull(),data:text('data').notNull()},t=>[primaryKey({columns:[t.session,t.user,t.sample]})]);
 
 export const historical=sqliteTable('historical',{id:text('id').primaryKey(),data:text('data').notNull()});
+
+// Club membership. `user` is the verified identity from the auth provider (Clerk user ID or gateway user ID).
+export const profiles=sqliteTable('profiles',{user:text('user').primaryKey(),name:text('name').notNull(),email:text('email').notNull().default(''),role:text('role').notNull().default('member'),status:text('status').notNull().default('active'),bio:text('bio').notNull().default(''),historyNames:text('history_names').notNull().default('[]'),avatarVersion:integer('avatar_version').notNull().default(0),createdAt:text('created_at').notNull()});
+export const avatars=sqliteTable('avatars',{user:text('user').primaryKey(),mime:text('mime').notNull(),data:text('data').notNull()});

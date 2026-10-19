@@ -1,8 +1,9 @@
 import history from '@/lib/history-seed';
 import {drinkCategory} from '@/lib/drink-categories';
 import {env} from 'cloudflare:workers';
+import {requireMember,fail} from '@/lib/auth';
 export const dynamic='force-dynamic';
-export async function GET(r:Request){if(!r.headers.get('oai-authenticated-user-id'))return Response.json({error:'Logga in först.'},{status:401});try{
+export async function GET(r:Request){try{await requireMember(r,env);}catch(e){return fail(e)}try{
  const count:any=await env.DB!.prepare('SELECT COUNT(*) as n FROM historical').first();
  if(count.n<history.length)await env.DB!.batch(history.map(s=>env.DB!.prepare('INSERT OR IGNORE INTO historical(id,data) VALUES(?,?)').bind(s.id,JSON.stringify(s))));
  // Repair the original importer treating the wine named Petter as a header.

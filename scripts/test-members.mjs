@@ -1,0 +1,70 @@
+import assert from 'node:assert/strict';
+import {generateKeyPairSync,createSign} from 'node:crypto';
+import {createDb,route} from './test-harness.mjs';
+const env={...createDb(),ADMIN_EMAILS:'Boss@Club.test'};
+const club=await route('club',env),members=await route('members',env),profile=await route('profile',env),avatar=await route('avatar',env),session=await route('session',env),history=await route('history',env);
+const headers=(user,extra={})=>({...(user?{'oai-authenticated-user-id':user,'oai-authenticated-user-email':user+'@club.test'}:{}),'Content-Type':'application/json','Origin':'https://test.local',...extra});
+const call=async(handler,user,path,body,status=200,extra)=>{const r=await handler[body?'POST':'GET'](new Request('https://test.local'+path,{method:body?'POST':'GET',headers:headers(user,extra),...(body?{body:JSON.stringify(body)}:{})}));const d=r.headers.get('content-type')?.includes('json')?await r.json():r;assert.equal(r.status,status,JSON.stringify(d));return d;};
+
+// Gateway mode: profiles are created on first request; admin comes from ADMIN_EMAILS.
+let s=await call(session,null,'/api/session');assert.equal(s.auth.mode,'gateway');assert.equal(s.me,null);
+s=await call(session,'boss','/api/session');assert.equal(s.me.admin,true);assert.equal((await call(profile,'guest','/api/profile?user=boss')).profile.admin,true);
+s=await call(session,'guest','/api/session');assert.equal(s.me.admin,false);assert.equal(s.me.name,'guest');
+let list=await call(members,'guest','/api/members');assert.equal(list.members.length,2);assert.equal(list.members[0].email,undefined);assert.equal(list.archiveNames,undefined);
+await call(members,'guest','/api/members',{action:'update',user:'guest',role:'admin'},403);
+await call(members,'boss','/api/members',{action:'update',user:'boss',status:'removed'},400);
+list=await call(members,'boss','/api/members');assert.equal(list.members.find(m=>m.id==='guest').email,'guest@club.test');
+await call(members,'boss','/api/members',{action:'invite',email:'new@club.test'},400);
+
+// Profiles show only revealed results. Own edits only.
+await call(profile,'guest','/api/profile',{action:'update',name:'Gästen',bio:'Gillar rom'});
+let t=await call(club,'boss','/api/club',{action:'create',title:'Romkväll'});
+t=await call(club,'boss','/api/club',{action:'save',id:t.id,version:t.version,title:'Romkväll',date:'2026-10-01',plan:{theme:'',notes:'',budget:null,expected:[],samples:[{id:'r1',name:'Hemlig rom',number:1,type:'Rom'}]}});
+t=await call(club,'boss','/api/club',{action:'start',id:t.id});
+await call(club,'guest','/api/club',{action:'join',id:t.id,token:t.token,name:'Gästen'});
+await call(club,'guest','/api/club',{action:'vote',id:t.id,sample:'r1',vote:{score:9,comment:'Toppen'}});
+let p=await call(profile,'boss','/api/profile?user=guest');assert.equal(p.profile.name,'Gästen');assert.equal(p.profile.own,false);assert.equal(p.tastings.length,0);assert.equal(p.upcoming.length,0);assert.ok(!JSON.stringify(p).includes('Hemlig rom'));
+p=await call(profile,'guest','/api/profile');assert.equal(p.upcoming.length,1);assert.ok(!JSON.stringify(p).includes('Hemlig rom'));
+await call(club,'boss','/api/club',{action:'join',id:t.id,token:t.token,name:'Boss'});
+await call(club,'boss','/api/club',{action:'vote',id:t.id,sample:'r1',vote:{score:7}});
+await call(club,'boss','/api/club',{action:'reveal',id:t.id});
+p=await call(profile,'boss','/api/profile?user=guest');assert.equal(p.tastings[0].samples[0].name,'Hemlig rom');assert.equal(p.tastings[0].samples[0].score,9);assert.equal(p.tastings[0].samples[0].average,8);assert.equal(p.stats.ratings,1);
+
+// Historical archive names can be linked to a member by the admin.
+env.sqlite.prepare('INSERT INTO historical(id,data) VALUES(?,?)').run('h1',JSON.stringify({id:'h1',title:'Gammal ölkväll',date:'2020-10-29',samples:[{id:'h1s1',name:'Grandiose',type:'Lager',average:8.4,ratings:[{name:'Gäst',score:8,comment:'Fin'},{name:'Annan',score:9}]}]}));
+list=await call(members,'boss','/api/members');assert.deepEqual(list.archiveNames,['Annan','Gäst']);
+await call(members,'boss','/api/members',{action:'update',user:'guest',historyNames:['Gäst']});
+p=await call(profile,'guest','/api/profile');assert.equal(p.tastings.length,2);assert.equal(p.favorites[0].name,'Hemlig rom');assert.equal(p.tastings.find(x=>x.source==='archive').samples[0].score,8);
+const archive=await call(history,'guest','/api/history');assert.equal(archive.sessions.length,2);
+
+// Avatars: validated image bytes, served only to signed-in members.
+const png='data:image/png;base64,'+Buffer.from([0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a,1,2,3]).toString('base64');
+await call(profile,'guest','/api/profile',{action:'avatar',image:'data:image/png;base64,'+Buffer.from('<svg/>').toString('base64')},400);
+await call(profile,'guest','/api/profile',{action:'avatar',image:'data:image/svg+xml;base64,PHN2Zy8+'},400);
+p=await call(profile,'guest','/api/profile',{action:'avatar',image:png});assert.equal(p.profile.avatar,1);
+let img=await call(avatar,'boss','/api/avatar?user=guest');assert.equal(img.headers.get('content-type'),'image/png');assert.equal((await img.arrayBuffer()).byteLength,11);
+await call(avatar,null,'/api/avatar?user=guest',undefined,401);
+
+// Removed members lose access everywhere, including links they already have.
+await call(members,'boss','/api/members',{action:'update',user:'guest',status:'removed'});
+await call(club,'guest','/api/club',undefined,403);await call(profile,'guest','/api/profile',undefined,403);await call(history,'guest','/api/history',undefined,403);
+await call(avatar,'boss','/api/avatar?user=guest',undefined,404);
+list=await call(members,'boss','/api/members');assert.equal(list.members.find(m=>m.id==='guest').status,'removed');
+await call(members,'boss','/api/members',{action:'update',user:'guest',status:'active'});await call(club,'guest','/api/club');
+
+// Clerk mode: identity headers are ignored; only a valid session token for this origin counts.
+const {privateKey,publicKey}=generateKeyPairSync('rsa',{modulusLength:2048});
+const jwtKey=publicKey.export({type:'spki',format:'pem'}).toString();
+const b64=o=>Buffer.from(JSON.stringify(o)).toString('base64url');
+const token=(claims={})=>{const now=Math.floor(Date.now()/1000);const body=b64({alg:'RS256',typ:'JWT',kid:'ins_test'})+'.'+b64({sub:'user_clerk',sid:'sess_1',iss:'https://clerk.test.local',azp:'https://test.local',iat:now-5,nbf:now-5,exp:now+60,...claims});return body+'.'+createSign('RSA-SHA256').update(body).sign(privateKey).toString('base64url');};
+Object.assign(env,{AUTH_MODE:'clerk',CLERK_PUBLISHABLE_KEY:'pk_test_Y2xlcmsudGVzdC5sb2NhbCQ',CLERK_JWT_KEY:jwtKey});
+env.sqlite.prepare("INSERT INTO profiles(user,name,email,created_at) VALUES('user_clerk','Clerk-medlem','boss@club.test','2026-10-19')").run();
+s=await call(session,'boss','/api/session');assert.equal(s.auth.mode,'clerk');assert.equal(s.auth.publishableKey,'pk_test_Y2xlcmsudGVzdC5sb2NhbCQ');assert.equal(s.me,null);
+await call(club,'boss','/api/club',undefined,401);
+s=await call(session,null,'/api/session',undefined,200,{Authorization:'Bearer '+token()});assert.equal(s.me.id,'user_clerk');assert.equal(s.me.admin,true);
+s=await call(session,null,'/api/session',undefined,200,{Cookie:'theme=x; __session='+token()});assert.equal(s.me.id,'user_clerk');
+await call(club,null,'/api/club',undefined,401,{Authorization:'Bearer '+token({azp:'https://evil.test'})});
+await call(club,null,'/api/club',undefined,401,{Authorization:'Bearer '+token({exp:Math.floor(Date.now()/1000)-120})});
+await call(club,null,'/api/club',undefined,401,{Authorization:'Bearer '+token().slice(0,-4)+'AAAA'});
+await call(club,null,'/api/club',undefined,200,{Authorization:'Bearer '+token()});
+console.log('PASS: membership, admin rules, removal, profiles without premature disclosure, archive linking, avatar validation, Clerk token verification.');
