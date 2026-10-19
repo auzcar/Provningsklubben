@@ -60,6 +60,12 @@ assert.ok(!(await call(club,'guest','/api/club')).sessions.some(x=>x.id===plan.i
 plan=await call(club,'boss','/api/club',{action:'start',id:plan.id});assert.equal(plan.joined,true);assert.equal(plan.people.length,2);assert.equal(plan.cost.perPerson,525);
 let mine=await call(club,'guest','/api/club?id='+plan.id);assert.equal(mine.joined,true);assert.equal(mine.cost.perPerson,525);assert.equal(mine.plan.samples[0].name,undefined);
 await call(club,'guest','/api/club',{action:'delete',id:plan.id},400);
+await call(club,'guest','/api/club',{action:'serve',id:plan.id,sample:1},400);
+await call(club,'boss','/api/club',{action:'serve',id:plan.id,sample:9},400);
+await call(club,'boss','/api/club',{action:'serve',id:plan.id,sample:1});assert.equal((await call(club,'guest','/api/club?id='+plan.id)).plan.served,1);
+await call(club,'guest','/api/club',{action:'vote',id:plan.id,sample:'w2',vote:{score:7,tags:['Rökig','Hackig','Rökig'],guess:'450'}});
+assert.deepEqual((await call(club,'guest','/api/club?id='+plan.id)).mine.w2,{score:7,skip:false,comment:'',tags:['Rökig'],guess:450});
+await call(club,'guest','/api/club',{action:'vote',id:plan.id,sample:'w2',vote:{score:7,guess:-5}},400);
 await call(club,'guest','/api/club',{action:'vote',id:plan.id,sample:'w1',vote:{score:8}});
 plan=await call(club,'boss','/api/club',{action:'remove-participant',id:plan.id,user:'guest'});assert.equal(plan.people.length,1);
 assert.equal(env.sqlite.prepare("SELECT COUNT(*) n FROM ratings WHERE session=?").get(plan.id).n,0);

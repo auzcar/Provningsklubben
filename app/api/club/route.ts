@@ -12,7 +12,7 @@ async function detail(id:string,user:string){
  const progress=(await db().prepare('SELECT user,COUNT(*) as completed FROM ratings WHERE session=? GROUP BY user').bind(id).all()).results;
  const all=s.status==='revealed'?(await db().prepare('SELECT r.sample,r.data,m.name FROM ratings r JOIN members m ON r.session=m.session AND r.user=m.user WHERE r.session=?').bind(id).all()).results:[];
  const headcount=s.status==='draft'?(plan.participants||[]).length:people.length;
- return {id:s.id,title:s.title,date:s.date,status:s.status,version:s.version,host,self:user,joined:!!member,cost:costShare(plan.samples,headcount),token:host?s.token:undefined,plan:host?plan:{theme:plan.theme,participants:plan.participants||[],samples:visibleSamples(plan.samples,false,s.status==='revealed')},people,progress,mine:Object.fromEntries(mine.map((v:any)=>[v.sample,JSON.parse(v.data)])),results:all.map((v:any)=>({...JSON.parse(v.data),sample:v.sample,name:v.name}))};
+ return {id:s.id,title:s.title,date:s.date,status:s.status,version:s.version,host,self:user,joined:!!member,cost:costShare(plan.samples,headcount),token:host?s.token:undefined,plan:host?plan:{theme:plan.theme,participants:plan.participants||[],served:plan.served??null,samples:visibleSamples(plan.samples,false,s.status==='revealed')},people,progress,mine:Object.fromEntries(mine.map((v:any)=>[v.sample,JSON.parse(v.data)])),results:all.map((v:any)=>({...JSON.parse(v.data),sample:v.sample,name:v.name}))};
 }
 export async function GET(r:Request){try{const user=await uid(r);const id=new URL(r.url).searchParams.get('id');if(id)return reply(await detail(id,user));const rows=(await db().prepare('SELECT DISTINCT t.id,t.title,t.date,t.status,t.owner FROM tastings t LEFT JOIN members m ON t.id=m.session WHERE t.owner=? OR m.user=? ORDER BY t.date DESC').bind(user,user).all()).results;return reply({user,sessions:rows.map((s:any)=>({...s,host:s.owner===user,owner:undefined}))});}catch(e:any){return fail(e)}}
 export async function POST(r:Request){try{
@@ -45,6 +45,10 @@ export async function POST(r:Request){try{
  if(s.status!=='active')throw Error('Provningen är inte pågående.');
  const memberCount:any=await db().prepare('SELECT COUNT(*) as n FROM members WHERE session=?').bind(id).first();if(memberCount.n<plan.expected.length)throw Error('Alla planerade deltagare har inte anslutit ännu.');
  const out=await db().prepare("UPDATE tastings SET status='revealed',version=version+1 WHERE id=? AND status='active' AND EXISTS(SELECT 1 FROM members WHERE session=?) AND NOT EXISTS(SELECT 1 FROM members m WHERE m.session=? AND (SELECT COUNT(*) FROM ratings r WHERE r.session=m.session AND r.user=m.user) < ?)").bind(id,id,id,plan.samples.length).run();if(!out.meta.changes)throw Error('Alla anslutna deltagare måste betygsätta eller avstå på samtliga prov först.');
+ }else if(b.action==='serve'){
+ // The host puts a glass on the table; everyone's tasting mode offers to jump there.
+ const n=Number(b.sample);if(s.status!=='active'||!Number.isInteger(n)||n<0||n>=plan.samples.length)throw Error('Ogiltigt prov.');
+ await db().prepare("UPDATE tastings SET data=json_set(data,'$.served',?) WHERE id=? AND status='active'").bind(n,id).run();
  }else if(b.action==='remove-participant'){
  // Someone who never showed up would otherwise block the reveal forever.
  if(s.status!=='active')throw Error('Provningen är inte pågående.');
