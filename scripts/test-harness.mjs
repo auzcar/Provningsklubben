@@ -11,7 +11,7 @@ export function createDb(){
  const db=new DatabaseSync(':memory:');
  for(const file of fs.readdirSync('drizzle').filter(x=>x.endsWith('.sql')).sort())db.exec(fs.readFileSync('drizzle/'+file,'utf8'));
  class Statement{constructor(sql,params=[]){this.sql=sql;this.params=params;}bind(...params){return new Statement(this.sql,params)}async first(){return db.prepare(this.sql).get(...this.params)||null}async all(){return {results:db.prepare(this.sql).all(...this.params)}}async run(){const r=db.prepare(this.sql).run(...this.params);return {meta:{changes:Number(r.changes)}}}}
- return {sqlite:db,DB:{prepare:s=>new Statement(s),batch:async a=>{const r=[];for(const s of a)r.push(await s.run());return r;}}};
+ return {sqlite:db,DB:{prepare:s=>new Statement(s),batch:async a=>{const r=[];db.exec('BEGIN');try{for(const s of a)r.push(/^\s*select/i.test(s.sql)?await s.all():await s.run());db.exec('COMMIT');}catch(e){db.exec('ROLLBACK');throw e;}return r;}}};
 }
 function compile(src,dest){
  const code=fs.readFileSync(src,'utf8').replace(/from\s+['"]cloudflare:workers['"]/g,`from '${url('env.mjs')}'`).replace(/from\s+['"]@\/lib\/([\w-]+)['"]/g,(_,m)=>`from '${url('lib/'+m+'.mjs')}'`);

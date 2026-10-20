@@ -3,11 +3,11 @@ import {validatePlan,validateVote,visibleSamples,costShare} from '@/lib/model';
 import {requireMember,reply,fail,sameOrigin} from '@/lib/auth';
 import {isTestUser} from '@/lib/test-users';
 export const dynamic='force-dynamic';
-const uid=async(r:Request)=>(await requireMember(r,env)).id;
 const db=()=>{if(!env.DB)throw Error('Databasen är inte tillgänglig.');return env.DB;};
-async function detail(id:string,user:string){
+async function detail(id:string,user:string,admin=false){
  const s:any=await db().prepare('SELECT * FROM tastings WHERE id=?').bind(id).first();if(!s)throw Error('Provningen finns inte.');
- const host=s.owner===user;const member=await db().prepare('SELECT * FROM members WHERE session=? AND user=?').bind(id,user).first();if(!host&&!member)throw Error('Anslut via provningens inbjudningslänk först.');
+ const host=s.owner===user;const member=await db().prepare('SELECT * FROM members WHERE session=? AND user=?').bind(id,user).first();// An admin may open any revealed tasting (its results are in the archive anyway), e.g. to remove it.
+ if(!host&&!member&&!(admin&&s.status==='revealed'))throw Error('Anslut via provningens inbjudningslänk först.');
  const plan=JSON.parse(s.data);const people=(await db().prepare('SELECT user,name,paid FROM members WHERE session=?').bind(id).all()).results;
  const mine=(await db().prepare('SELECT sample,data FROM ratings WHERE session=? AND user=?').bind(id,user).all()).results;
  const progress=(await db().prepare('SELECT user,COUNT(*) as completed FROM ratings WHERE session=? GROUP BY user').bind(id).all()).results;
@@ -19,10 +19,10 @@ async function detail(id:string,user:string){
  const pay=member&&!host&&owner?.swish?{to:owner.name,swish:owner.swish,amount:cost.perPerson&&cost.perPerson>0?cost.perPerson:null,paid:!!(member as any).paid}:undefined;
  return {id:s.id,title:s.title,date:s.date,status:s.status,version:s.version,host,self:user,joined:!!member,cost,pay,hostSwish:host?owner?.swish||'':undefined,token:host?s.token:undefined,plan:host?plan:{theme:plan.theme,participants:plan.participants||[],served:plan.served??null,samples:visibleSamples(plan.samples,false,s.status==='revealed')},people:host?people:people.map(({paid,...p}:any)=>p),progress,mine:Object.fromEntries(mine.map((v:any)=>[v.sample,JSON.parse(v.data)])),results:all.map((v:any)=>({...JSON.parse(v.data),sample:v.sample,name:v.name}))};
 }
-export async function GET(r:Request){try{const user=await uid(r);const id=new URL(r.url).searchParams.get('id');if(id)return reply(await detail(id,user));const rows=(await db().prepare('SELECT DISTINCT t.id,t.title,t.date,t.status,t.owner FROM tastings t LEFT JOIN members m ON t.id=m.session WHERE t.owner=? OR m.user=? ORDER BY t.date DESC').bind(user,user).all()).results;return reply({user,sessions:rows.map((s:any)=>({...s,host:s.owner===user,owner:undefined}))});}catch(e:any){return fail(e)}}
+export async function GET(r:Request){try{const me=await requireMember(r,env),user=me.id;const id=new URL(r.url).searchParams.get('id');if(id)return reply(await detail(id,user,me.admin));const rows=(await db().prepare('SELECT DISTINCT t.id,t.title,t.date,t.status,t.owner FROM tastings t LEFT JOIN members m ON t.id=m.session WHERE t.owner=? OR m.user=? ORDER BY t.date DESC').bind(user,user).all()).results;return reply({user,sessions:rows.map((s:any)=>({...s,host:s.owner===user,owner:undefined}))});}catch(e:any){return fail(e)}}
 export async function POST(r:Request){try{
  if(!sameOrigin(r))return reply({error:'Ogiltig begäran.'},403);
- const user=await uid(r);const b:any=await r.json();let id=b.id;
+ const me=await requireMember(r,env),user=me.id;const b:any=await r.json();let id=b.id;
  if(b.action==='create'){
  id=crypto.randomUUID();const plan={theme:'',notes:'',budget:null,expected:[],participants:[user],samples:[]};
  await db().prepare('INSERT INTO tastings(id,owner,status,title,date,data,token,version) VALUES(?,?,?,?,?,?,?,1)').bind(id,user,'draft',String(b.title||'Ny provning').slice(0,150),'',JSON.stringify(plan),crypto.randomUUID()+crypto.randomUUID()).run();return reply(await detail(id,user));}
@@ -34,6 +34,13 @@ export async function POST(r:Request){try{
  if(s.status!=='active'||b.token!==s.token)throw Error('Inbjudan är ogiltig eller provningen är inte öppen.');
  const name=String(b.name||'').trim().slice(0,60);if(!name)throw Error('Ange ditt namn.');
  await db().prepare("INSERT INTO members(session,user,name) SELECT ?,?,? WHERE EXISTS(SELECT 1 FROM tastings WHERE id=? AND status='active') ON CONFLICT(session,user) DO UPDATE SET name=excluded.name").bind(id,user,name,id).run();return reply(await detail(id,user));}
+ if(b.action==='delete'&&s.status==='revealed'){
+ // Revealed tastings belong to the archive: only an admin may remove one, after typing its title.
+ if(!me.admin)throw Error('Bara administratören kan ta bort en avslöjad provning.');
+ if(String(b.confirm??'').trim()!==s.title.trim())throw Error('Namnet stämde inte. Inget togs bort.');
+ await db().batch([db().prepare('DELETE FROM ratings WHERE session=?').bind(id),db().prepare('DELETE FROM members WHERE session=?').bind(id),db().prepare('DELETE FROM tastings WHERE id=?').bind(id)]);
+ return reply({deleted:true});
+ }
  const host=s.owner===user;const plan=JSON.parse(s.data);
  if(b.action==='vote'){
  const m=await db().prepare('SELECT user FROM members WHERE session=? AND user=?').bind(id,user).first();if(!m||s.status!=='active'||!plan.samples.some((x:any)=>x.id===b.sample))throw Error('Du kan inte betygsätta detta prov nu.');

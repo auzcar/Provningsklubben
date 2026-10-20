@@ -18,6 +18,8 @@ type Deploy = {
   name?: string;
   d1?: { database_name: string; database_id: string };
   vars?: Record<string, string>;
+  // Weekly database backup: a KV namespace id and a cron schedule (lib/backup.ts).
+  backups?: { kv_namespace_id: string; cron: string };
 };
 const deployFile = new URL("./cloudflare.deploy.json", import.meta.url);
 const deployConfig: Deploy = existsSync(deployFile)
@@ -46,6 +48,12 @@ const bindingConfig = (deploy: Deploy) => ({
         },
       ]
     : [],
+  ...(deploy.backups
+    ? {
+        kv_namespaces: [{ binding: "BACKUPS", id: deploy.backups.kv_namespace_id }],
+        triggers: { crons: [deploy.backups.cron] },
+      }
+    : {}),
   r2_buckets: r2
     ? [
         {

@@ -14,7 +14,7 @@ Claude, Claude Code, ChatGPT/Codex, Gemini och Antigravity.
 - Installation: Node.js 24 och pnpm 11.25.0, sedan `pnpm install --frozen-lockfile`.
 - Lokal databas: `pnpm db:migrate:local`. Utveckling: `pnpm dev`.
 - Kontroller: `pnpm test`, `pnpm typecheck` och `pnpm build`.
-- Data och exportbegränsningar: `docs/DATA.md` och `docs/VERIFICATION.md`.
+- Data och exportbegränsningar: `docs/DATA.md` och `docs/VERIFICATION.md`. Säkerhetskopior: `lib/backup.ts`, `app/api/backup/` och veckojobbet i `build/sites-worker.ts` (se `docs/DATA.md`).
 - Språk i sidans innehåll: svenska, om inget annat sägs.
 
 ## Arbetsregler
@@ -38,4 +38,5 @@ Claude, Claude Code, ChatGPT/Codex, Gemini och Antigravity.
 - Ändra inte produktionsmiljö, databas eller autentisering utan uttryckligt godkännande.
 - Extern produktion kräver en verifierad autentiseringslösning. Lita aldrig på identitetshuvuden från klienten; lokal testinloggning är endast för utveckling på loopback.
 - Använd en separat worktree per aktiv agent. Kör kontrollerna ovan före pull request.
-- Profilsidor, profilbilder och Clerk-inloggning finns i koden men är inte i produktion. Separata historiska provningssidor finns inte; beskriv dem inte som färdiga.
+- Produktionen körs på Cloudflare med Clerk-inloggning, profilsidor och profilbilder. Separata historiska provningssidor finns inte; beskriv dem inte som färdiga.
+- Avslöjade provningar kan bara tas bort av en administratör som skriver provningens namn för att bekräfta.
