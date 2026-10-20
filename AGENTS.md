@@ -38,5 +38,5 @@ Claude, Claude Code, ChatGPT/Codex, Gemini och Antigravity.
 - Ändra inte produktionsmiljö, databas eller autentisering utan uttryckligt godkännande.
 - Extern produktion kräver en verifierad autentiseringslösning. Lita aldrig på identitetshuvuden från klienten; lokal testinloggning är endast för utveckling på loopback.
 - Använd en separat worktree per aktiv agent. Kör kontrollerna ovan före pull request.
-- Produktionen körs på Cloudflare med Clerk-inloggning, profilsidor och profilbilder. Separata historiska provningssidor finns inte; beskriv dem inte som färdiga.
+- Produktionen körs på Cloudflare med Clerk-inloggning, profilsidor och profilbilder. Historiska provningar visas under Provningar → Tidigare provningar (`app/archive-tasting.tsx`, endast läsning).
 - Avslöjade provningar kan bara tas bort av en administratör som skriver provningens namn för att bekräfta.
