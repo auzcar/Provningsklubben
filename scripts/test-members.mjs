@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import {generateKeyPairSync,createSign} from 'node:crypto';
 import {createDb,route} from './test-harness.mjs';
 const env={...createDb(),ADMIN_EMAILS:'Boss@Club.test'};
-const imp=await route('import',env),club=await route('club',env),members=await route('members',env),profile=await route('profile',env),avatar=await route('avatar',env),session=await route('session',env),history=await route('history',env);
+const backupRoute=await route('backup',env),imp=await route('import',env),club=await route('club',env),members=await route('members',env),profile=await route('profile',env),avatar=await route('avatar',env),session=await route('session',env),history=await route('history',env);
 const headers=(user,extra={})=>({...(user?{'oai-authenticated-user-id':user,'oai-authenticated-user-email':user+'@club.test'}:{}),'Content-Type':'application/json','Origin':'https://test.local',...extra});
 const call=async(handler,user,path,body,status=200,extra)=>{const r=await handler[body?'POST':'GET'](new Request('https://test.local'+path,{method:body?'POST':'GET',headers:headers(user,extra),...(body?{body:JSON.stringify(body)}:{})}));const d=r.headers.get('content-type')?.includes('json')?await r.json():r;assert.equal(r.status,status,JSON.stringify(d));return d;};
 
@@ -129,6 +129,26 @@ await call(session,'boss','/api/session',undefined,403,as('test:host'));
 for(const t of ['profiles','members','ratings'])assert.equal(env.sqlite.prepare(`SELECT COUNT(*) n FROM ${t} WHERE user LIKE 'test:%'`).get().n,0);
 assert.equal(env.sqlite.prepare("SELECT COUNT(*) n FROM tastings WHERE owner LIKE 'test:%'").get().n,0);
 
+// Full backup: admin only, every table; restoring it puts a deleted tasting back with its owner.
+await call(members,'boss','/api/members',{action:'test-setup'});
+await call(backupRoute,'guest','/api/backup',undefined,403);
+await call(backupRoute,'boss','/api/backup',undefined,403,as('test:host'));
+const full=await call(backupRoute,'boss','/api/backup');assert.equal(full.format,2);
+for(const t of ['historical','tastings','members','ratings','profiles','avatars'])assert.ok(Array.isArray(full.tables[t]),t);
+assert.ok(full.tables.profiles.some(p=>p.user==='guest'));
+assert.deepEqual(await call(backupRoute,'boss','/api/backup?list=1'),{automatic:false,dates:[]});
+const rom=full.tables.tastings.find(x=>x.title==='Romkväll'&&x.status==='revealed');assert.ok(rom);
+await call(club,'guest','/api/club',{action:'delete',id:rom.id,confirm:'Romkväll'},400);
+await call(club,'boss','/api/club',{action:'delete',id:rom.id,confirm:'Romkvä'},400);
+await call(club,'boss','/api/club',{action:'delete',id:rom.id,confirm:'Romkväll'},400,as('test:host'));
+await call(club,'boss','/api/club',{action:'delete',id:rom.id,confirm:'Romkväll'});
+assert.ok(!(await call(history,'guest','/api/history')).sessions.some(x=>x.id===rom.id));
+const restored=await call(imp,'boss','/api/import',full);assert.equal(restored.full.tastings,1);assert.ok(restored.full.ratings>=1);assert.equal(restored.full.profiles,0);
+assert.equal(env.sqlite.prepare('SELECT owner FROM tastings WHERE id=?').get(rom.id).owner,rom.owner);
+assert.ok((await call(history,'guest','/api/history')).sessions.some(x=>x.id===rom.id));
+assert.equal((await call(imp,'boss','/api/import',full)).full.tastings,0);
+await call(members,'boss','/api/members',{action:'test-reset'});
+
 // Clerk mode: identity headers are ignored; only a valid session token for this origin counts.
 const {privateKey,publicKey}=generateKeyPairSync('rsa',{modulusLength:2048});
 const jwtKey=publicKey.export({type:'spki',format:'pem'}).toString();
@@ -144,4 +164,4 @@ await call(club,null,'/api/club',undefined,401,{Authorization:'Bearer '+token({a
 await call(club,null,'/api/club',undefined,401,{Authorization:'Bearer '+token({exp:Math.floor(Date.now()/1000)-120})});
 await call(club,null,'/api/club',undefined,401,{Authorization:'Bearer '+token().slice(0,-4)+'AAAA'});
 await call(club,null,'/api/club',undefined,200,{Authorization:'Bearer '+token()});
-console.log('PASS: membership, admin rules, removal, profiles without premature disclosure, archive linking, avatar validation, participants, cost split, Swish, deletion, backup import, admin test mode isolation, Clerk token verification.');
+console.log('PASS: membership, admin rules, removal, profiles without premature disclosure, archive linking, avatar validation, participants, cost split, Swish, deletion, backup import, admin test mode isolation, full backup and restore, admin removal of revealed tastings, Clerk token verification.');

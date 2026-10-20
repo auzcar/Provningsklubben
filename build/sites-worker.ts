@@ -1,6 +1,7 @@
 import handler from "vinext/server/fetch-handler";
 import { runWithConnectorBinding } from "../lib/connector-context";
 import type { ConnectorBinding } from "../lib/connector-contract.mjs";
+import { storeSnapshot } from "../lib/backup";
 
 export default {
   fetch(request: Request, env: Cloudflare.Env, ctx: ExecutionContext<{ CONNECTORS?: ConnectorBinding }>) {
@@ -24,5 +25,10 @@ export default {
       };
     }
     return runWithConnectorBinding(binding, () => handler.fetch(request, env, ctx));
+  },
+  // Weekly backup (cron in cloudflare.deploy.json), only when the BACKUPS KV binding exists.
+  async scheduled(_controller: ScheduledController, env: Cloudflare.Env, ctx: ExecutionContext) {
+    const kv = (env as { BACKUPS?: KVNamespace }).BACKUPS;
+    if (kv && env.DB) ctx.waitUntil(storeSnapshot(env.DB, kv));
   },
 };
