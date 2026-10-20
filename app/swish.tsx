@@ -12,10 +12,10 @@ export function SwishPay({current,onPaid,busy}:{current:any;onPaid:(paid:boolean
  return <section className={'swish-card'+(pay.paid?' paid':'')}>
   <div><div className="eyebrow">DIN ANDEL</div><strong>{pay.amount!=null?`${pay.amount.toLocaleString('sv-SE')} kr`:'Belopp saknas'}</strong><span>till {pay.to} · {formatSwish(pay.swish)}</span></div>
   <div className="swish-actions">
-   {!pay.paid&&<a className="primary swish-button" href={swishLink(pay.swish,pay.amount,message)}><Smartphone size={17}/>Swisha {pay.to.split(' ')[0]}</a>}
+   {!pay.paid&&pay.amount!=null&&<a className="primary swish-button" href={swishLink(pay.swish,pay.amount,message)}><Smartphone size={17}/>Swisha {pay.to.split(' ')[0]}</a>}
    <label className="check swish-check"><input type="checkbox" checked={pay.paid} disabled={busy} onChange={e=>onPaid(e.target.checked)}/>{pay.paid?<><Check size={14}/>Du har swishat</>:'Jag har swishat'}</label>
   </div>
-  {!pay.paid&&<small className="muted">Öppnar Swish med belopp och meddelandet ”{message}”. Fungerar på telefonen.</small>}
+  {!pay.paid&&<small className="muted">{pay.amount!=null?`Öppnar Swish med belopp och meddelandet ”${message}”. Fungerar på telefonen.`:'Priserna är inte ifyllda än, så andelen går inte att räkna ut. Fråga värden.'}</small>}
  </section>;
 }
 

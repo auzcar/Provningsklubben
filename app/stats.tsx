@@ -30,7 +30,7 @@ export default function Stats({archive}:{archive:any}){
  const contested=[...rated].sort((a,b)=>b.spread-a.spread).slice(0,3);
  const bargains=priced.filter((d:any)=>d.price>=50&&d.avg!=null&&d.scores.length>=2).map((d:any)=>({...d,value:d.avg/d.price*100})).sort((a:any,b:any)=>b.value-a.value).slice(0,3);
  // Is expensive better? Compared within each tasting, see lib/stats-math.ts.
- const pricedRows:PricedDrink[]=drinks.filter((d:any)=>d.avg!=null).map((d:any)=>({group:d.sessionId+'|'+(d.serving||''),price:d.price,volume:d.volume,avg:d.avg,category:d.category}));
+ const pricedRows:PricedDrink[]=drinks.filter((d:any)=>d.avg!=null).map((d:any)=>({group:d.sessionId,price:d.price,volume:d.volume,avg:d.avg,category:d.category}));
  const overall=priceEffect(pricedRows,5000);
  const catEffects=byCat.map(c=>({c:c.c,e:priceEffect(pricedRows.filter(r=>r.category===c.c))})).filter(x=>x.e&&x.e.df>=4) as {c:string;e:PriceEffect}[];
  const holmP=holm(catEffects.map(x=>x.e.p));
@@ -95,7 +95,7 @@ export default function Stats({archive}:{archive:any}){
     <div className="forest-axis"><span>−{fmt(span,1)}</span><span>0</span><span>+{fmt(span,1)}</span></div></>}
     <details className="method"><summary>Hur räknar vi?</summary>
      <p>Priserna skiljer sig enormt mellan dryckestyper, så en cognac kan inte jämföras med en öl. Därför jämförs varje dryck bara med de andra dryckerna i samma provning: samma kväll, samma jury och nästan alltid samma typ. Det tar också bort skillnader i hur generösa olika kvällar var.</p>
-     <p>Priset räknas per liter när volymen är känd och på en logaritmisk skala, så att ett steg alltid betyder att priset fördubblas. Pris och snittbetyg centreras inom varje provning, och betyget regresseras på priset (en så kallad fixed effects-modell). Serveringar som ren och G&amp;T räknas som egna grupper.</p>
+     <p>Priset räknas per liter när volymen är känd och på en logaritmisk skala, så att ett steg alltid betyder att priset fördubblas. Pris och snittbetyg centreras inom varje provning, och betyget regresseras på priset (en så kallad fixed effects-modell). Samma flaska serverad på två sätt, till exempel ren och i G&amp;T, finns med en gång per servering.</p>
      <p>p-värdet kommer från ett t-test och kontrolleras med ett permutationstest där priserna blandas slumpvis inom varje provning, utan antagande om normalfördelning. Kategorierna testas var för sig, och deras p-värden är Holm-justerade för att flera test görs samtidigt. Ifylld prick betyder p &lt; 0,05 efter justering. Drycker utan pris eller betyg och provningar med bara en prissatt dryck räknas inte.</p>
     </details></>}
    </section>

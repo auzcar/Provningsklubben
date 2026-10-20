@@ -65,7 +65,7 @@ await call(profile,'boss','/api/profile',{action:'update',name:'Boss',bio:'',swi
 await call(profile,'boss','/api/profile',{action:'update',name:'Boss',bio:'',swish:'+46 70-123 45 67'});
 assert.equal((await call(profile,'boss','/api/profile')).profile.swish,'0701234567');assert.equal((await call(profile,'guest','/api/profile?user=boss')).profile.swish,undefined);
 let g=await call(club,'guest','/api/club?id='+plan.id);assert.deepEqual(g.pay,{to:'Boss',swish:'0701234567',amount:525,paid:false});
-g=await call(club,'guest','/api/club',{action:'paid',id:plan.id,paid:true});assert.equal(g.pay.paid,true);
+g=await call(club,'guest','/api/club',{action:'paid',id:plan.id,paid:true});assert.equal(g.pay.paid,true);assert.ok(g.people.every(x=>!('paid' in x)),'participants must not see payment flags');
 let hostView=await call(club,'boss','/api/club?id='+plan.id);assert.equal(hostView.pay,undefined);assert.equal(hostView.hostSwish,'0701234567');assert.equal(hostView.people.find(x=>x.user==='guest').paid,1);
 await call(club,'stranger','/api/club',{action:'paid',id:plan.id,paid:true},400);
 await call(club,'guest','/api/club',{action:'serve',id:plan.id,sample:1},400);
