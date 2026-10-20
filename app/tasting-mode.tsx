@@ -4,6 +4,7 @@ import {X,ChevronLeft,ChevronRight,Check,Eye,EyeOff,Users,Copy,UserMinus,LoaderC
 import {api} from '@/lib/client-api';
 import {TASTE_TAGS} from '@/lib/model';
 import {Avatar} from './profile';
+import {SwishPay} from './swish';
 
 type Vote={score:number|null;skip:boolean;comment:string;tags:string[];guess:number|null};
 type Draft=Vote&{state:'saved'|'pending'|'error'|'empty';message?:string};
@@ -15,7 +16,7 @@ const PROMPTS=['Vad påminner doften om? Alla säger ett ord samtidigt.','Gissa 
 
 // Full-screen blind tasting: one glass at a time, autosave, and the table in view.
 // The host scores too; the drink's identity only shows while the reveal button is held.
-export default function TastingMode({current,onExit,onReveal,canReveal,revealHint,onCopyLink,onRemove,onServe,busy}:{current:any;onExit:()=>void;onReveal:()=>void;canReveal:boolean;revealHint:string;onCopyLink:()=>void;onRemove:(user:string,name:string)=>void;onServe:(index:number)=>void;busy:boolean}){
+export default function TastingMode({current,onExit,onReveal,canReveal,revealHint,onCopyLink,onRemove,onServe,onPaid,busy}:{current:any;onPaid:(paid:boolean)=>void;onExit:()=>void;onReveal:()=>void;canReveal:boolean;revealHint:string;onCopyLink:()=>void;onRemove:(user:string,name:string)=>void;onServe:(index:number)=>void;busy:boolean}){
  const samples=current.plan.samples as any[];
  const [index,setIndex]=useState(()=>{const i=samples.findIndex(s=>!current.mine[s.id]);return i<0?samples.length:i;});
  const [votes,setVotes]=useState<Record<string,Draft>>(()=>Object.fromEntries(samples.map(s=>{const v=current.mine[s.id];return [s.id,v?{tags:[],guess:null,...v,state:'saved'}:{score:null,skip:false,comment:'',tags:[],guess:null,state:'empty'}];})));
@@ -100,6 +101,7 @@ export default function TastingMode({current,onExit,onReveal,canReveal,revealHin
    <h2>{completed===samples.length?'Skål!':'Nästan där'}</h2>
    <p>{completed===samples.length?'Du har betygsatt alla prov. Lägg ifrån dig telefonen och snacka med bordet. Resultatet avslöjas tillsammans.':`Du har betygsatt ${completed} av ${samples.length} prov.`}</p>
    {completed===samples.length&&<div className="tm-prompt dark"><MessageCircle size={16}/><p>Medan ni väntar: vilket prov tror ni vinner, och vem har gett lägst betyg?</p></div>}
+   {completed===samples.length&&<SwishPay current={current} onPaid={onPaid} busy={busy}/>}
    {completed<samples.length&&<button className="tm-cta" onClick={()=>go(samples.findIndex(s=>!done(votes[s.id])))}>Till nästa obesvarade</button>}
    {current.host&&<button className="tm-cta" onClick={()=>setPanel(true)}><Users size={17}/>Värdpanelen</button>}
   </main>}
