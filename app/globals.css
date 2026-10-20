@@ -208,10 +208,6 @@ nav button{color:#ead9bf;font-weight:600}
 .forest-label{font-weight:600;font-size:14px}.forest-label small,.forest-num small{display:block;font-size:12px;font-weight:500;color:var(--muted)}.forest-num{text-align:right;font-weight:700;font-size:14px}
 .forest-track{position:relative;height:22px}.forest-zero{position:absolute;left:50%;top:0;bottom:0;width:1px;background:#8a7560}.forest-ci{position:absolute;top:50%;height:2px;margin-top:-1px;background:#7a1f2c;border-radius:1px}
 .forest-dot{position:absolute;top:50%;width:12px;height:12px;transform:translate(-50%,-50%);border-radius:50%;background:var(--label);border:2px solid #7a1f2c;box-shadow:0 0 0 2px var(--label)}.forest-dot.sig{background:#7a1f2c}
-.scatter{margin:14px 0 0;min-width:0}.scatter svg{display:block;overflow:visible;touch-action:pan-y}.scatter figcaption{margin-top:4px;min-height:2.6em}
-.sc-grid{stroke:#e2d4b8;stroke-width:1}.sc-zero{stroke:#8a7560;stroke-width:1}.sc-band{fill:#7a1f2c;opacity:.14}.sc-fit{stroke:#7a1f2c;stroke-width:2.5;stroke-linecap:round}
-.sc-dot{fill:#7a1f2c;fill-opacity:.45;stroke:var(--label);stroke-width:1.5;cursor:pointer}.sc-dot.on{fill-opacity:1;stroke:#2a1a17}
-.sc-tick{font-size:11px;fill:#6b5644}.sc-axis{font-size:12px;fill:#6b5644;font-style:italic}
 .forest-figure{margin:14px 0 0}.forest-figure figcaption{margin:0 0 4px}
 .forest-row.total{padding:8px 0;margin-bottom:4px;border-bottom:1px dashed #c9b48e;border-radius:0}.forest-row.total .forest-label{font-family:var(--serif);font-size:16px}.forest-row.total .forest-num{font-size:16px}
 .forest-diamond{position:absolute;top:50%;height:18px;margin-top:-9px;min-width:6px;background:#7a1f2c66;clip-path:polygon(0 50%,50% 0,100% 50%,50% 100%)}.forest-diamond.sig{background:#7a1f2c}
