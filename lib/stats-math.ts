@@ -74,8 +74,10 @@ export function holm(ps:number[]){
 // standard error is cluster-robust by tasting (CR1, t with clusters−1 df), because drinks
 // from the same evening share a jury and a mood and are not independent.
 export type TypedDrink={session:string;type:string;price:number;volume?:number|null;avg:number};
-export type GlobalEffect={n:number;types:number;clusters:number;df:number;slope:number;se:number;low:number;high:number;p:number;r:number};
-export function globalPriceEffect(drinks:TypedDrink[],minPerType=5):GlobalEffect|null{
+export type GlobalEffect={n:number;types:number;clusters:number;df:number;slope:number;se:number;low:number;high:number;p:number;r:number;clustered:boolean};
+// With fewer than three tastings clustering is impossible; allowUnclustered then falls back to
+// ordinary OLS standard errors (t with n−types−1 df), which ignores the shared-evening dependence.
+export function globalPriceEffect(drinks:TypedDrink[],minPerType=5,allowUnclustered=false):GlobalEffect|null{
  const byType=new Map<string,TypedDrink[]>();for(const d of drinks){if(!(d.price>0)||!Number.isFinite(d.avg))continue;const g=byType.get(d.type)||[];g.push(d);byType.set(d.type,g);}
  const z:number[]=[],y:number[]=[],cl:string[]=[];let types=0;
  for(const g of byType.values()){
@@ -87,10 +89,14 @@ export function globalPriceEffect(drinks:TypedDrink[],minPerType=5):GlobalEffect
   const my=g.reduce((a,d)=>a+d.avg,0)/g.length;
   g.forEach((d,i)=>{z.push((xs[i]-mx)/sd);y.push(d.avg-my);cl.push(d.session);});types++;
  }
- const n=z.length,clusters=new Set(cl).size,k=types+1;if(clusters<3||n<=k)return null;
- const szz=z.reduce((a,v)=>a+v*v,0),syy=y.reduce((a,v)=>a+v*v,0),szy=z.reduce((a,v,i)=>a+v*y[i],0);
- const slope=szy/szz,score=new Map<string,number>();z.forEach((v,i)=>score.set(cl[i],(score.get(cl[i])||0)+v*(y[i]-slope*v)));
- let meat=0;for(const s of score.values())meat+=s*s;
- const se=Math.sqrt(meat/(szz*szz)*(clusters/(clusters-1))*((n-1)/(n-k))),df=clusters-1,crit=tCritical(df);
- return {n,types,clusters,df,slope,se,low:slope-crit*se,high:slope+crit*se,p:tPValue(slope/se,df),r:szy/Math.sqrt(szz*syy)};
+ const n=z.length,clusters=new Set(cl).size,k=types+1,clustered=clusters>=3;if(!clustered&&!allowUnclustered||n<=k)return null;
+ const szz=z.reduce((a,v)=>a+v*v,0),syy=y.reduce((a,v)=>a+v*v,0),szy=z.reduce((a,v,i)=>a+v*y[i],0);if(szz===0||syy===0)return null;
+ const slope=szy/szz;let se:number,df:number;
+ if(clustered){
+  const score=new Map<string,number>();z.forEach((v,i)=>score.set(cl[i],(score.get(cl[i])||0)+v*(y[i]-slope*v)));
+  let meat=0;for(const s of score.values())meat+=s*s;
+  se=Math.sqrt(meat/(szz*szz)*(clusters/(clusters-1))*((n-1)/(n-k)));df=clusters-1;
+ }else{df=n-k;se=Math.sqrt(y.reduce((a,v,i)=>a+(v-slope*z[i])**2,0)/df/szz);}
+ const crit=tCritical(df);
+ return {n,types,clusters,df,slope,se,low:slope-crit*se,high:slope+crit*se,p:tPValue(slope/se,df),r:szy/Math.sqrt(szz*syy),clustered};
 }

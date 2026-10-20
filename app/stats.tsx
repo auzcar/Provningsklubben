@@ -58,9 +58,10 @@ export default function Stats({archive}:{archive:any}){
  const typeOf=(d:any)=>(d.category==='Öl'||d.category==='Vin')&&d.subcategory?d.subcategory:d.category;
  const typedRows:TypedDrink[]=drinks.filter((d:any)=>d.avg!=null).map((d:any)=>({session:d.sessionId,type:typeOf(d),price:d.price,volume:d.volume,avg:d.avg}));
  const global=globalPriceEffect(typedRows);
- // Per type the same model on one type at a time; needs drinks from at least three tastings.
- const typeEffects=[...new Set(typedRows.map(r=>r.type))].map(t=>({c:t,e:globalPriceEffect(typedRows.filter(r=>r.type===t))})).filter(x=>x.e).sort((a,b)=>b.e!.n-a.e!.n) as {c:string;e:GlobalEffect}[];
+ // Per type the same model on one type at a time; types from one or two tastings get ordinary standard errors.
+ const typeEffects=[...new Set(typedRows.map(r=>r.type))].map(t=>({c:t,e:globalPriceEffect(typedRows.filter(r=>r.type===t),5,true)})).filter(x=>x.e).sort((a,b)=>b.e!.n-a.e!.n) as {c:string;e:GlobalEffect}[];
  const typeHolm=holm(typeEffects.map(x=>x.e.p));
+ const fewTypes=[...new Set(typedRows.map(r=>r.type))].filter(t=>!typeEffects.some(x=>x.c===t)).sort((a,b)=>a.localeCompare(b,'sv'));
  const names=[...new Set<string>(drinks.flatMap((d:any)=>d.ratings.map((v:any)=>v.name)))];
  const people=names.map(n=>{
   const mine:{score:number;cat:string;sessionId:string}[]=drinks.flatMap((d:any)=>d.ratings.filter((v:any)=>v.name===n&&v.score!=null&&!v.skip).map((v:any)=>({score:v.score,cat:d.category,sessionId:d.sessionId})));
@@ -110,11 +111,12 @@ export default function Stats({archive}:{archive:any}){
      <div><b>r = {fmt(global.r,2)}</b><span>partiell korrelation</span></div>
      <div><b>{global.n} drycker</b><span>i {global.types} typer, {global.clusters} provningar</span></div>
     </div>
-    <Forest unit="poäng per standardavvikelse i pris inom typen" label="Effekt av pris inom dryckestyp" total={{c:'Alla typer',sub:`${global.types} typer`,e:global}} rows={typeEffects.map((x,i)=>({c:x.c,sub:`${x.e.clusters} provningar`,e:x.e,adj:typeHolm[i]}))}/>
+    <Forest unit="poäng per standardavvikelse i pris inom typen" label="Effekt av pris inom dryckestyp" total={{c:'Alla typer',sub:`${global.types} typer`,e:global}} rows={typeEffects.map((x,i)=>({c:x.c,sub:`${x.e.n} drycker, ${x.e.clusters} ${x.e.clusters===1?'provning':'provningar'}${x.e.clustered?'':'*'}`,e:x.e,adj:typeHolm[i]}))}/>
+    <p className="muted fine">{typeEffects.some(x=>!x.e.clustered)&&'* Provad under färre än tre kvällar: vanliga standardfel, som inte tar hänsyn till att drycker från samma kväll hänger ihop, så intervallet kan vara för smalt. '}{fewTypes.length>0&&`För få prissatta drycker (under fem) för att räknas: ${fewTypes.join(', ')}.`}</p>
     <details className="method"><summary>Hur räknar vi?</summary>
      <p>Priserna skiljer sig enormt mellan dryckestyper, så en cognac kan inte jämföras med en öl i kronor. Därför standardiseras priset inom varje dryckestyp: whisky mot whisky, cognac mot cognac, lager mot lager. Typerna är kategorierna, men öl och vin delas upp per stil (lager, IPA, rött, vitt och så vidare). En dyr lager och en dyr cognac hamnar därmed på samma skala.</p>
      <p>Priset räknas per liter (saknad volym ersätts med typens medianvolym) och på en logaritmisk skala, och görs om till ett z-värde inom typen: hur många standardavvikelser dyrare eller billigare än typens snitt flaskan är. Betyget jämförs med typens snitt, och betyget regresseras på z-värdet.</p>
-     <p>Drycker från samma kväll delar jury och humör och är inte oberoende, därför används klusterrobusta standardfel per provning (t-fördelning med antal provningar minus ett frihetsgrader). Typer med färre än fem prissatta drycker räknas inte, och i diagrammet visas en typ för sig först när den provats under minst tre kvällar. Typernas p-värden är Holm-justerade för att flera test görs samtidigt; ifylld markör betyder p &lt; 0,05.</p>
+     <p>Drycker från samma kväll delar jury och humör och är inte oberoende, därför används klusterrobusta standardfel per provning (t-fördelning med antal provningar minus ett frihetsgrader). Typer med färre än fem prissatta drycker räknas inte. En typ som bara provats under en eller två kvällar kan inte klustras och får i diagrammet vanliga standardfel (markerad med *). Typernas p-värden är Holm-justerade för att flera test görs samtidigt; ifylld markör betyder p &lt; 0,05.</p>
     </details></>}
    </section>
 

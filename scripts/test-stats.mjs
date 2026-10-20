@@ -16,6 +16,11 @@ const typed=[["s0","Lager",15.2,33,7.57],["s0","Lager",12.6,33,5.84],["s0","Lage
 const glob=m.globalPriceEffect(typed);
 // statsmodels 0.15: ols('avg ~ z + C(type)').fit(cov_type='cluster', groups=session, use_t=True)
 close(glob.slope,-0.0247427491739472);close(glob.se,0.15677723870137855);close(glob.p,0.8807734788973804);close(glob.low,-0.42775147122092955,1e-5);close(glob.high,0.37826597287303515,1e-5);assert.equal(glob.clusters,6);assert.equal(glob.types,3);
+// One type from two tastings: no clustering possible, so OLS (statsmodels ols('avg ~ z')).
+const wh=typed.filter(r=>r.type==='Whisky');assert.equal(m.globalPriceEffect(wh),null);
+const one=m.globalPriceEffect(wh,5,true);assert.equal(one.clustered,false);assert.equal(one.df,8);
+close(one.slope,-0.39711792873471585);close(one.se,0.14618463192982686);close(one.p,0.026389202085252726);close(one.low,-0.7342202944681955,1e-5);close(one.high,-0.06001556300123617,1e-5);
+assert.equal(glob.clustered,true);
 assert.equal(m.priceEffect(rows.slice(0,1)),null);
 assert.deepEqual(m.holm([0.01,0.04,0.03]).map(v=>+v.toFixed(4)),[0.03,0.06,0.06]);
-console.log('PASS: t distribution, critical values, within-tasting price effect, CI, permutation, Holm and cluster-robust global effect match SciPy/statsmodels.');
+console.log('PASS: t distribution, critical values, within-tasting price effect, CI, permutation, Holm and cluster-robust and single-type global effect match SciPy/statsmodels.');
