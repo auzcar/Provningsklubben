@@ -253,3 +253,12 @@ body:has(.test-bar){padding-top:40px}body:has(.test-bar) .tasting-mode,body:has(
 .shopping-list li.done b{text-decoration:line-through;opacity:.6}
 .archive-edit{margin:8px 0 12px;padding:12px;border:1px dashed #c9b48e;border-radius:4px}.archive-edit .form-grid{margin-bottom:8px}
 @media(min-width:761px){body:has(.test-bar) .sidebar{top:40px;height:calc(100vh - 40px)}}
+/* All ratings on the profile (app/my-ratings.tsx) */
+.chip-row{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 4px}.chip-row.sub{margin-top:2px}
+.chip{border:1px solid #c9b48e;background:transparent;color:inherit;border-radius:999px;padding:5px 11px;font:inherit;font-size:13px;cursor:pointer}.chip b{font-weight:600;opacity:.7;margin-left:2px}.chip.on{background:#7a1f2c;border-color:#7a1f2c;color:#fbf6ec}
+.chip-row.sub .chip{font-size:12px;padding:3px 9px}
+.my-ratings-tools{gap:8px;margin:8px 0}.my-ratings-tools select{width:auto}
+.rating-list{list-style:none;margin:0;padding:0;display:grid}.rating-list li{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #d8c7a633}
+.rating-main{display:flex;flex-direction:column;flex:1;min-width:0}.rating-main b{font-weight:600}.rating-main small{color:var(--muted);font-size:12px}
+.rating-list .icon-button.on{background:#7a1f2c;color:#fbf6ec;border-color:#7a1f2c}
+.my-list{margin:12px 0 16px}.my-list .shopping-list li{justify-content:space-between}.my-list .shopping-list li>span{display:flex;flex-direction:column;flex:1;min-width:0}
