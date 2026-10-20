@@ -1,6 +1,6 @@
 'use client';
 import {useEffect,useState} from 'react';
-import {Trophy,Frown,Flame,PiggyBank,Users,Heart,Gavel,Sparkles,Star,Coins,MessageSquareQuote} from 'lucide-react';
+import {Trophy,Frown,Flame,PiggyBank,Users,Heart,Gavel,Sparkles,Star,Coins,MessageSquareQuote,Target} from 'lucide-react';
 import {api} from '@/lib/client-api';
 import {categoryOrder} from '@/lib/drink-categories';
 import SbLink from './sb-link';
@@ -60,6 +60,8 @@ export default function Stats({archive}:{archive:any}){
  const stepHolm=holm(steps.map(e=>e.p));const pooled=pool(steps);
  const best=steps[0],worst=steps[steps.length-1];
  const fewTypes=[...new Set(typedRows.filter(r=>r.price>0).map(r=>r.type))].filter(t=>!steps.some(e=>e.type===t)).sort((a,b)=>a.localeCompare(b,'sv'));
+ // Price guessers: average distance from the real price, in per cent, at least three guesses.
+ const guessers=Object.entries<number[]>(drinks.flatMap((d:any)=>d.price>0?d.ratings.filter((v:any)=>v.guess!=null).map((v:any)=>({name:v.name,err:Math.abs(v.guess-d.price)/d.price})):[]).reduce((m:Record<string,number[]>,g:any)=>{(m[g.name]||=[]).push(g.err);return m;},{})).map(([name,errs]:[string,number[]])=>({name,n:errs.length,err:errs.reduce((a,b)=>a+b,0)/errs.length})).filter(g=>g.n>=3).sort((a,b)=>a.err-b.err).slice(0,5);
  const names=[...new Set<string>(drinks.flatMap((d:any)=>d.ratings.map((v:any)=>v.name)))];
  const people=names.map(n=>{
   const mine:{score:number;cat:string;sessionId:string}[]=drinks.flatMap((d:any)=>d.ratings.filter((v:any)=>v.name===n&&v.score!=null&&!v.skip).map((v:any)=>({score:v.score,cat:d.category,sessionId:d.sessionId})));
@@ -99,6 +101,8 @@ export default function Stats({archive}:{archive:any}){
    <section className="stat-card"><h2><Frown size={20}/>Sorgebarnen</h2><ol className="fact-list">{bottom.map((d:any)=><li key={d.id}><span><b>{d.name} <SbLink drink={d}/></b><small>{d.session}</small></span><em>{fmt(d.avg)}</em></li>)}</ol></section>
    <section className="stat-card"><h2><Flame size={20}/>Mest omstridda</h2><ol className="fact-list">{contested.map((d:any)=><li key={d.id}><span><b>{d.name} <SbLink drink={d}/></b><small>Från {fmt(Math.min(...d.scores))} till {fmt(Math.max(...d.scores))}</small></span><em>{fmt(d.spread)}</em></li>)}</ol></section>
    <section className="stat-card"><h2><PiggyBank size={20}/>Fynden</h2><p className="muted">Flest poäng per hundralapp, flaskor från 50 kr.</p><ol className="fact-list">{bargains.map((d:any)=><li key={d.id}><span><b>{d.name} <SbLink drink={d}/></b><small>{kr(d.price)} · snitt {fmt(d.avg)}</small></span><em>{fmt(d.value,2)}<small> p/100 kr</small></em></li>)}</ol></section>
+
+   <section className="stat-card"><h2><Target size={20}/>Prisgissarna</h2>{guessers.length?<ol className="fact-list">{guessers.map(g=><li key={g.name}><span><b>{g.name}</b><small>{g.n} gissningar</small></span><em>{Math.round(g.err*100)} %<small> fel</small></em></li>)}</ol>:<p className="muted">Gissa flaskans pris när ni betygsätter, så visas här vem som gissar närmast. Det krävs minst tre gissningar.</p>}</section>
 
    <section className="stat-card wide"><h2><Coins size={20}/>Är dyrare godare?</h2>
     {!pooled?<p className="big-claim">För lite prisdata ännu.</p>:<>
