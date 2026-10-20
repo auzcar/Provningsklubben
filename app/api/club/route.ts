@@ -7,12 +7,16 @@ const db=()=>{if(!env.DB)throw Error('Databasen är inte tillgänglig.');return 
 async function detail(id:string,user:string){
  const s:any=await db().prepare('SELECT * FROM tastings WHERE id=?').bind(id).first();if(!s)throw Error('Provningen finns inte.');
  const host=s.owner===user;const member=await db().prepare('SELECT * FROM members WHERE session=? AND user=?').bind(id,user).first();if(!host&&!member)throw Error('Anslut via provningens inbjudningslänk först.');
- const plan=JSON.parse(s.data);const people=(await db().prepare('SELECT user,name FROM members WHERE session=?').bind(id).all()).results;
+ const plan=JSON.parse(s.data);const people=(await db().prepare('SELECT user,name,paid FROM members WHERE session=?').bind(id).all()).results;
  const mine=(await db().prepare('SELECT sample,data FROM ratings WHERE session=? AND user=?').bind(id,user).all()).results;
  const progress=(await db().prepare('SELECT user,COUNT(*) as completed FROM ratings WHERE session=? GROUP BY user').bind(id).all()).results;
  const all=s.status==='revealed'?(await db().prepare('SELECT r.sample,r.data,m.name FROM ratings r JOIN members m ON r.session=m.session AND r.user=m.user WHERE r.session=?').bind(id).all()).results:[];
  const headcount=s.status==='draft'?(plan.participants||[]).length:people.length;
- return {id:s.id,title:s.title,date:s.date,status:s.status,version:s.version,host,self:user,joined:!!member,cost:costShare(plan.samples,headcount),token:host?s.token:undefined,plan:host?plan:{theme:plan.theme,participants:plan.participants||[],served:plan.served??null,samples:visibleSamples(plan.samples,false,s.status==='revealed')},people,progress,mine:Object.fromEntries(mine.map((v:any)=>[v.sample,JSON.parse(v.data)])),results:all.map((v:any)=>({...JSON.parse(v.data),sample:v.sample,name:v.name}))};
+ const owner:any=await db().prepare('SELECT name,swish FROM profiles WHERE user=?').bind(s.owner).first();
+ const cost=costShare(plan.samples,headcount);
+ // Participants pay the host by Swish; the host sees who has marked themselves as paid.
+ const pay=member&&!host&&owner?.swish?{to:owner.name,swish:owner.swish,amount:cost.perPerson,paid:!!(member as any).paid}:undefined;
+ return {id:s.id,title:s.title,date:s.date,status:s.status,version:s.version,host,self:user,joined:!!member,cost,pay,hostSwish:host?owner?.swish||'':undefined,token:host?s.token:undefined,plan:host?plan:{theme:plan.theme,participants:plan.participants||[],served:plan.served??null,samples:visibleSamples(plan.samples,false,s.status==='revealed')},people,progress,mine:Object.fromEntries(mine.map((v:any)=>[v.sample,JSON.parse(v.data)])),results:all.map((v:any)=>({...JSON.parse(v.data),sample:v.sample,name:v.name}))};
 }
 export async function GET(r:Request){try{const user=await uid(r);const id=new URL(r.url).searchParams.get('id');if(id)return reply(await detail(id,user));const rows=(await db().prepare('SELECT DISTINCT t.id,t.title,t.date,t.status,t.owner FROM tastings t LEFT JOIN members m ON t.id=m.session WHERE t.owner=? OR m.user=? ORDER BY t.date DESC').bind(user,user).all()).results;return reply({user,sessions:rows.map((s:any)=>({...s,host:s.owner===user,owner:undefined}))});}catch(e:any){return fail(e)}}
 export async function POST(r:Request){try{
@@ -31,6 +35,9 @@ export async function POST(r:Request){try{
  const m=await db().prepare('SELECT user FROM members WHERE session=? AND user=?').bind(id,user).first();if(!m||s.status!=='active'||!plan.samples.some((x:any)=>x.id===b.sample))throw Error('Du kan inte betygsätta detta prov nu.');
  const v=validateVote(b.vote);
  const result=await db().prepare("INSERT INTO ratings(session,user,sample,data) SELECT ?,?,?,? WHERE EXISTS(SELECT 1 FROM tastings WHERE id=? AND status='active') ON CONFLICT(session,user,sample) DO UPDATE SET data=excluded.data").bind(id,user,b.sample,JSON.stringify(v),id).run();if(!result.meta.changes)throw Error('Provningen har avslutats.');return reply({ok:true});}
+ if(b.action==='paid'){
+ const m=await db().prepare('SELECT user FROM members WHERE session=? AND user=?').bind(id,user).first();if(!m)throw Error('Du deltar inte i provningen.');
+ await db().prepare('UPDATE members SET paid=? WHERE session=? AND user=?').bind(b.paid?1:0,id,user).run();return reply(await detail(id,user));}
  if(!host)throw Error('Endast värden kan göra detta.');
  if(b.action==='save'){
  if(s.status!=='draft')throw Error('Planeringen är låst under provningen.');const p=validatePlan(b.plan);const title=String(b.title||'').trim().slice(0,150);if(!title)throw Error('Ange en titel.');const date=String(b.date||'');if(date&&!/^\d{4}-\d{2}-\d{2}$/.test(date))throw Error('Ogiltigt datum.');
@@ -45,7 +52,7 @@ export async function POST(r:Request){try{
  if(s.status!=='active')throw Error('Provningen är inte pågående.');
  const memberCount:any=await db().prepare('SELECT COUNT(*) as n FROM members WHERE session=?').bind(id).first();if(memberCount.n<plan.expected.length)throw Error('Alla planerade deltagare har inte anslutit ännu.');
  const out=await db().prepare("UPDATE tastings SET status='revealed',version=version+1 WHERE id=? AND status='active' AND EXISTS(SELECT 1 FROM members WHERE session=?) AND NOT EXISTS(SELECT 1 FROM members m WHERE m.session=? AND (SELECT COUNT(*) FROM ratings r WHERE r.session=m.session AND r.user=m.user) < ?)").bind(id,id,id,plan.samples.length).run();if(!out.meta.changes)throw Error('Alla anslutna deltagare måste betygsätta eller avstå på samtliga prov först.');
- }else if(b.action==='serve'){
+  }else if(b.action==='serve'){
  // The host puts a glass on the table; everyone's tasting mode offers to jump there.
  const n=Number(b.sample);if(s.status!=='active'||!Number.isInteger(n)||n<0||n>=plan.samples.length)throw Error('Ogiltigt prov.');
  await db().prepare("UPDATE tastings SET data=json_set(data,'$.served',?) WHERE id=? AND status='active'").bind(n,id).run();

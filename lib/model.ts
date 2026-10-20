@@ -11,6 +11,18 @@ export function validatePlan(p:any):Plan{
  if(new Set(samples.map((s:Sample)=>s.id)).size!==samples.length||samples.some((s:Sample)=>!s.id||!s.name.trim()))throw Error('Varje dryck behöver ett namn och ett unikt id.');
  return {theme:text(p.theme,100),notes:text(p.notes,5000),budget:num(p.budget,100000),expected:Array.isArray(p.expected)?p.expected.map((x:any)=>text(x,60).trim()).filter(Boolean).slice(0,40):[],participants:Array.isArray(p.participants)?[...new Set<string>(p.participants.map((x:any)=>text(x,200)).filter(Boolean))].slice(0,40):[],samples};
 }
+// Swish numbers: private mobile (07…) or business (123…), stored as plain digits.
+export function normalizeSwish(input:any){
+ let d=String(input??'').replace(/[\s\-()]/g,'');if(!d)return '';
+ if(d.startsWith('+46'))d='0'+d.slice(3);else if(d.startsWith('0046'))d='0'+d.slice(4);
+ if(!/^(07\d{8}|123\d{7})$/.test(d))throw Error('Ange ett Swishnummer som 070-123 45 67 eller 123 456 78 90.');
+ return d;
+}
+/** Opens the Swish app with payee, amount and message filled in; the payer only confirms. */
+export function swishLink(number:string,amount:number|null,message:string){
+ const data={version:1,payee:{value:number},...(amount?{amount:{value:amount}}:{}),message:{value:message.slice(0,50),editable:true}};
+ return 'swish://payment?data='+encodeURIComponent(JSON.stringify(data));
+}
 // Even split of the known bottle prices, rounded up to whole kronor.
 export function costShare(samples:Sample[],people:number){const total=samples.reduce((n,s)=>n+(Number(s.price)||0),0);return {total,people,perPerson:people>0?Math.ceil(total/people):null};
 }

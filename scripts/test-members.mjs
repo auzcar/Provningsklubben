@@ -60,6 +60,14 @@ assert.ok(!(await call(club,'guest','/api/club')).sessions.some(x=>x.id===plan.i
 plan=await call(club,'boss','/api/club',{action:'start',id:plan.id});assert.equal(plan.joined,true);assert.equal(plan.people.length,2);assert.equal(plan.cost.perPerson,525);
 let mine=await call(club,'guest','/api/club?id='+plan.id);assert.equal(mine.joined,true);assert.equal(mine.cost.perPerson,525);assert.equal(mine.plan.samples[0].name,undefined);
 await call(club,'guest','/api/club',{action:'delete',id:plan.id},400);
+// Swish: the host's number reaches participants with their share; they mark themselves as paid.
+await call(profile,'boss','/api/profile',{action:'update',name:'Boss',bio:'',swish:'12345'},400);
+await call(profile,'boss','/api/profile',{action:'update',name:'Boss',bio:'',swish:'+46 70-123 45 67'});
+assert.equal((await call(profile,'boss','/api/profile')).profile.swish,'0701234567');assert.equal((await call(profile,'guest','/api/profile?user=boss')).profile.swish,undefined);
+let g=await call(club,'guest','/api/club?id='+plan.id);assert.deepEqual(g.pay,{to:'Boss',swish:'0701234567',amount:525,paid:false});
+g=await call(club,'guest','/api/club',{action:'paid',id:plan.id,paid:true});assert.equal(g.pay.paid,true);
+let hostView=await call(club,'boss','/api/club?id='+plan.id);assert.equal(hostView.pay,undefined);assert.equal(hostView.hostSwish,'0701234567');assert.equal(hostView.people.find(x=>x.user==='guest').paid,1);
+await call(club,'stranger','/api/club',{action:'paid',id:plan.id,paid:true},400);
 await call(club,'guest','/api/club',{action:'serve',id:plan.id,sample:1},400);
 await call(club,'boss','/api/club',{action:'serve',id:plan.id,sample:9},400);
 await call(club,'boss','/api/club',{action:'serve',id:plan.id,sample:1});assert.equal((await call(club,'guest','/api/club?id='+plan.id)).plan.served,1);
@@ -100,4 +108,4 @@ await call(club,null,'/api/club',undefined,401,{Authorization:'Bearer '+token({a
 await call(club,null,'/api/club',undefined,401,{Authorization:'Bearer '+token({exp:Math.floor(Date.now()/1000)-120})});
 await call(club,null,'/api/club',undefined,401,{Authorization:'Bearer '+token().slice(0,-4)+'AAAA'});
 await call(club,null,'/api/club',undefined,200,{Authorization:'Bearer '+token()});
-console.log('PASS: membership, admin rules, removal, profiles without premature disclosure, archive linking, avatar validation, participants, cost split, deletion, backup import, Clerk token verification.');
+console.log('PASS: membership, admin rules, removal, profiles without premature disclosure, archive linking, avatar validation, participants, cost split, Swish, deletion, backup import, Clerk token verification.');

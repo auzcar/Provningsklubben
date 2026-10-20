@@ -4,6 +4,7 @@ import {Trophy,Frown,Flame,PiggyBank,Users,Heart,Gavel,Sparkles,Star,Coins,Messa
 import {api} from '@/lib/client-api';
 import {categoryOrder} from '@/lib/drink-categories';
 import SbLink from './sb-link';
+import {priceEffect,holm,type PricedDrink,type PriceEffect} from '@/lib/stats-math';
 
 const fmt=(n:any,d=1)=>n==null||!Number.isFinite(n)?'–':Number(n).toLocaleString('sv-SE',{minimumFractionDigits:d,maximumFractionDigits:d});
 const kr=(n:number)=>Math.round(n).toLocaleString('sv-SE')+' kr';
@@ -28,10 +29,14 @@ export default function Stats({archive}:{archive:any}){
  const top=[...rated].sort((a,b)=>b.avg-a.avg).slice(0,5);const bottom=[...rated].sort((a,b)=>a.avg-b.avg).slice(0,3);
  const contested=[...rated].sort((a,b)=>b.spread-a.spread).slice(0,3);
  const bargains=priced.filter((d:any)=>d.price>=50&&d.avg!=null&&d.scores.length>=2).map((d:any)=>({...d,value:d.avg/d.price*100})).sort((a:any,b:any)=>b.value-a.value).slice(0,3);
- // Is expensive better? Pearson correlation between price and average score.
- const pairs=priced.filter((d:any)=>d.avg!=null).map((d:any)=>[d.price,d.avg]);
- const corr=(()=>{if(pairs.length<5)return null;const mx=mean(pairs.map((p:any)=>p[0]))!,my=mean(pairs.map((p:any)=>p[1]))!;let sxy=0,sxx=0,syy=0;for(const [x,y] of pairs){sxy+=(x-mx)*(y-my);sxx+=(x-mx)**2;syy+=(y-my)**2;}return sxx&&syy?sxy/Math.sqrt(sxx*syy):null;})();
- const buckets=[['Under 100 kr',0,100],['100–299 kr',100,300],['300–499 kr',300,500],['500 kr och uppåt',500,Infinity]].map(([label,lo,hi]:any)=>{const ds=priced.filter((d:any)=>d.price>=lo&&d.price<hi&&d.avg!=null);return {label,count:ds.length,avg:mean(ds.map((d:any)=>d.avg))};}).filter(b=>b.count>0);
+ // Is expensive better? Compared within each tasting, see lib/stats-math.ts.
+ const pricedRows:PricedDrink[]=drinks.filter((d:any)=>d.avg!=null).map((d:any)=>({group:d.sessionId+'|'+(d.serving||''),price:d.price,volume:d.volume,avg:d.avg,category:d.category}));
+ const overall=priceEffect(pricedRows,5000);
+ const catEffects=byCat.map(c=>({c:c.c,e:priceEffect(pricedRows.filter(r=>r.category===c.c))})).filter(x=>x.e&&x.e.df>=4) as {c:string;e:PriceEffect}[];
+ const holmP=holm(catEffects.map(x=>x.e.p));
+ const span=Math.min(4,Math.max(1,...catEffects.flatMap(x=>[Math.abs(x.e.low),Math.abs(x.e.high)])));
+ const pos=(v:number)=>`${Math.max(0,Math.min(100,50+v/span*50))}%`;
+ const pf=(p:number)=>p<0.001?'< 0,001':fmt(p,3);
  const names=[...new Set<string>(drinks.flatMap((d:any)=>d.ratings.map((v:any)=>v.name)))];
  const people=names.map(n=>{
   const mine:{score:number;cat:string;sessionId:string}[]=drinks.flatMap((d:any)=>d.ratings.filter((v:any)=>v.name===n&&v.score!=null&&!v.skip).map((v:any)=>({score:v.score,cat:d.category,sessionId:d.sessionId})));
@@ -73,9 +78,26 @@ export default function Stats({archive}:{archive:any}){
    <section className="stat-card"><h2><PiggyBank size={20}/>Fynden</h2><p className="muted">Flest poäng per hundralapp, flaskor från 50 kr.</p><ol className="fact-list">{bargains.map((d:any)=><li key={d.id}><span><b>{d.name} <SbLink drink={d}/></b><small>{kr(d.price)} · snitt {fmt(d.avg)}</small></span><em>{fmt(d.value,2)}<small> p/100 kr</small></em></li>)}</ol></section>
 
    <section className="stat-card wide"><h2><Coins size={20}/>Är dyrare godare?</h2>
-    <p className="big-claim">{corr==null?'För lite prisdata ännu.':Math.abs(corr)<0.15?<>Nej, knappt alls. Sambandet mellan pris och betyg är <b>{fmt(corr,2)}</b>.</>:corr>0?<>Lite grann. Sambandet mellan pris och betyg är <b>{fmt(corr,2)}</b>.</>:<>Tvärtom! Sambandet mellan pris och betyg är <b>{fmt(corr,2)}</b>.</>}</p>
-    <div className="bar-chart" role="table" aria-label="Snittbetyg per prisklass">{buckets.map(b=><div className="bar-row" role="row" key={b.label} title={`${b.label}: snittbetyg ${fmt(b.avg)} (${b.count} drycker)`}><span role="cell" className="bar-label">{b.label}</span><span role="cell" className="bar-track"><span className="bar" style={{width:`${(b.avg||0)*10}%`}}/></span><span role="cell" className="bar-value">{fmt(b.avg)}</span><span role="cell" className="bar-avg">{b.count} st</span></div>)}</div>
-    <p className="muted fine">Snittbetyg per prisklass. Sambandet går från −1 till 1, där 0 betyder att priset inte säger något om betyget.</p>
+    {!overall?<p className="big-claim">För lite prisdata ännu.</p>:<>
+    <p className="big-claim">{overall.p<0.05?(overall.slope>0?'Ja, lite grann.':'Tvärtom!'):'Inte så att det går att säga säkert.'} När ni jämför drycker i samma provning ger en dubbelt så dyr flaska i snitt <b>{overall.slope>=0?'+':''}{fmt(overall.slope,2)} poäng</b>.</p>
+    <div className="effect-facts">
+     <div><b>{fmt(overall.low,2)} till {fmt(overall.high,2)}</b><span>95 % konfidensintervall</span></div>
+     <div><b>p = {pf(overall.p)}</b><span>t-test{overall.permP!=null?`, permutation p = ${pf(overall.permP)}`:''}</span></div>
+     <div><b>r = {fmt(overall.r,2)}</b><span>partiell korrelation</span></div>
+     <div><b>{overall.n} drycker</b><span>i {overall.groups} provningar</span></div>
+    </div>
+    {catEffects.length>0&&<><h3 className="effect-title">Per kategori</h3><p className="muted fine">Poäng per dubblat pris med 95 % konfidensintervall. Strecket i mitten är noll, alltså inget samband.</p>
+    <div className="forest" role="table" aria-label="Effekt av dubblat pris per kategori">{catEffects.map((x,i)=><div className="forest-row" role="row" key={x.c} title={`${x.c}: ${fmt(x.e.slope,2)} poäng per dubblat pris (95 % KI ${fmt(x.e.low,2)} till ${fmt(x.e.high,2)}), p = ${pf(x.e.p)}, Holm-justerat p = ${pf(holmP[i])}, ${x.e.n} drycker`}>
+     <span role="cell" className="forest-label">{x.c}<small>{x.e.n} drycker</small></span>
+     <span role="cell" className="forest-track"><span className="forest-zero"/><span className="forest-ci" style={{left:pos(x.e.low),right:`calc(100% - ${pos(x.e.high)})`}}/><span className={'forest-dot'+(holmP[i]<0.05?' sig':'')} style={{left:pos(x.e.slope)}}/></span>
+     <span role="cell" className="forest-num">{x.e.slope>=0?'+':''}{fmt(x.e.slope,2)}<small>justerat p = {pf(holmP[i])}</small></span>
+    </div>)}</div>
+    <div className="forest-axis"><span>−{fmt(span,1)}</span><span>0</span><span>+{fmt(span,1)}</span></div></>}
+    <details className="method"><summary>Hur räknar vi?</summary>
+     <p>Priserna skiljer sig enormt mellan dryckestyper, så en cognac kan inte jämföras med en öl. Därför jämförs varje dryck bara med de andra dryckerna i samma provning: samma kväll, samma jury och nästan alltid samma typ. Det tar också bort skillnader i hur generösa olika kvällar var.</p>
+     <p>Priset räknas per liter när volymen är känd och på en logaritmisk skala, så att ett steg alltid betyder att priset fördubblas. Pris och snittbetyg centreras inom varje provning, och betyget regresseras på priset (en så kallad fixed effects-modell). Serveringar som ren och G&amp;T räknas som egna grupper.</p>
+     <p>p-värdet kommer från ett t-test och kontrolleras med ett permutationstest där priserna blandas slumpvis inom varje provning, utan antagande om normalfördelning. Kategorierna testas var för sig, och deras p-värden är Holm-justerade för att flera test görs samtidigt. Ifylld prick betyder p &lt; 0,05 efter justering. Drycker utan pris eller betyg och provningar med bara en prissatt dryck räknas inte.</p>
+    </details></>}
    </section>
 
    <section className="stat-card wide"><h2><Users size={20}/>Juryn</h2>

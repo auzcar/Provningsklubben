@@ -31,7 +31,8 @@ export async function profileData(db:D1Database,id:string,viewer:Member,adminEma
  const rated=tastings.flatMap(t=>t.samples.filter((p:any)=>p.rated&&p.score!=null).map((p:any)=>({...p,session:t.title})));
  const favorites=[...rated].sort((a:any,b:any)=>b.score-a.score).slice(0,5);
  return {
-  profile:{...card(row,viewer,adminEmail(row.email)),own},
+  // The Swish number is only shown to its owner here; participants get it through their tasting.
+  profile:{...card(row,viewer,adminEmail(row.email)),own,...(own?{swish:row.swish||''}:{})},
   stats:{tastings:tastings.length,ratings:rated.length,average:average(rated.map((p:any)=>p.score)),hosted:joined.filter(t=>t.owner===id).length},
   favorites,
   tastings,

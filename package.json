@@ -13,7 +13,7 @@
     "deploy:cloudflare": "wrangler d1 migrations apply DB --remote --config dist/server/wrangler.json && wrangler deploy",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "db:generate": "drizzle-kit generate",
-    "test": "node scripts/test-club.mjs && node scripts/test-product.mjs && node scripts/test-members.mjs",
+    "test": "node scripts/test-club.mjs && node scripts/test-product.mjs && node scripts/test-members.mjs && node scripts/test-stats.mjs",
     "typecheck": "tsc --noEmit",
     "db:migrate:local": "node scripts/db-local.mjs migrate",
     "db:export:local": "node scripts/db-local.mjs export",
