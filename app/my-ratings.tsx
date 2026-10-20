@@ -23,10 +23,11 @@ export default function MyRatings({tastings,own,viewer}:{tastings:any[];own:bool
  const cats=categoryOrder.map(c=>({c,n:all.filter((p:any)=>p.category===c).length})).filter(x=>x.n>0);
  const subs=cat?[...new Set<string>(all.filter((p:any)=>p.category===cat&&p.subcategory).map((p:any)=>p.subcategory))].sort((a,b)=>a.localeCompare(b,'sv')):[];
  // Price filter and price sorts leave out drinks without a known price; those always go last.
+ // The filter compares whole kronor, the same rounded price the list shows.
  const priced=(p:any)=>p.price>0;
  const byPrice=(dir:number)=>(a:any,b:any)=>priced(a)&&priced(b)?dir*(a.price-b.price):Number(priced(b))-Number(priced(a));
  const sorts:Record<string,(a:any,b:any)=>number>={score:(a,b)=>b.score-a.score,cheap:byPrice(1),dear:byPrice(-1),value:(a,b)=>priced(a)&&priced(b)?b.score/b.price-a.score/a.price:Number(priced(b))-Number(priced(a)),recent:(a,b)=>(b.date||'').localeCompare(a.date||''),name:(a,b)=>a.name.localeCompare(b.name,'sv')};
- const shown=all.filter((p:any)=>(!cat||p.category===cat)&&(!sub||p.subcategory===sub)&&(!min||p.score>=Number(min))&&(!from||priced(p)&&p.price>=Number(from))&&(!to||priced(p)&&p.price<=Number(to))).sort(sorts[sort]);
+ const shown=all.filter((p:any)=>(!cat||p.category===cat)&&(!sub||p.subcategory===sub)&&(!min||p.score>=Number(min))&&(!from||priced(p)&&Math.round(p.price)>=Number(from))&&(!to||priced(p)&&Math.round(p.price)<=Number(to))).sort(sorts[sort]);
  const inList=(k:string)=>list.some(i=>i.key===k);
  const toggle=(p:any)=>save(inList(p.key)?list.filter(i=>i.key!==p.key):[...list,{key:p.key,name:p.name,article:p.article||'',productUrl:p.productUrl||'',price:p.price??null,score:p.score}]);
  const text=['Inköpslista',...list.map(i=>`• ${i.name}${i.article?` (art.nr ${i.article})`:''}${systembolagetUrl(i)?`\n  ${systembolagetUrl(i)}`:''}`)].join('\n');
