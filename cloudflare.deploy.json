@@ -6,5 +6,9 @@
   },
   "vars": {
     "AUTH_MODE": "clerk"
+  },
+  "backups": {
+    "kv_namespace_id": "e9aecb8bc4f44950a2d504545c981650",
+    "cron": "17 3 * * 1"
   }
 }

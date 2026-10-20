@@ -1,5 +1,6 @@
 'use client';
-import {Trophy,Flame,Handshake,PiggyBank,Target,Heart,Gavel,Sparkles,ArrowUpRight} from 'lucide-react';
+import {useEffect,useState} from 'react';
+import {Trophy,Flame,Handshake,PiggyBank,Target,Heart,Gavel,Sparkles,ArrowUpRight,Play,ChevronRight} from 'lucide-react';
 import {productImage,systembolagetUrl} from '@/lib/model';
 import SbLink from './sb-link';
 
@@ -39,8 +40,13 @@ export default function Results({current}:{current:any}){
  ].filter(Boolean) as any[];
  const podium=[scored[1],scored[0],scored[2]].map((r,i)=>r&&{...r,place:[2,1,3][i]});
 
+ // The dramatic reveal plays once per device and tasting, and can be replayed.
+ const key='reveal-seen:'+current.id;const [show,setShow]=useState(false);
+ useEffect(()=>{try{if(scored.length>1&&!localStorage.getItem(key))setShow(true);}catch{}},[key,scored.length]);
+ const done=()=>{setShow(false);try{localStorage.setItem(key,'1');}catch{}};
+ if(show)return <RevealShow rows={scored} title={current.title} onDone={done}/>;
  return <div className="results">
-  <div className="results-intro"><div className="eyebrow">NU VET VI VAD SOM FANNS I GLASEN</div><h2>Kvällens resultat</h2><p>Betygen är låsta. Dags att diskutera.</p></div>
+  <div className="results-intro"><div className="eyebrow">NU VET VI VAD SOM FANNS I GLASEN</div><h2>Kvällens resultat</h2><p>Betygen är låsta. Dags att diskutera.</p>{scored.length>1&&<button className="secondary small" onClick={()=>setShow(true)}><Play size={15}/>Spela upp avslöjandet igen</button>}</div>
   {scored.length>0&&<section className="podium" aria-label="Prispall">{podium.map((r:any)=>r&&<div key={r.id} className={'podium-step p'+r.place}>
    {r.image?<img src={productImage(r.image)} alt="" onError={e=>{e.currentTarget.style.display='none';}}/>:<Trophy size={r.place===1?34:26}/>}
    <strong>{r.name} <SbLink drink={r}/></strong><span className="podium-score">{fmt(r.average)}</span>
@@ -53,5 +59,23 @@ export default function Results({current}:{current:any}){
    <div className="ratings-grid">{p.ratings.map((v:any,j:number)=><div className="person-score" key={j}><span>{v.name}</span><strong>{v.skip?'Avstår':fmt(v.score)}</strong>{v.comment&&<p>{v.comment}</p>}</div>)}</div>
    {systembolagetUrl(p)&&<a className="text-button" href={systembolagetUrl(p)} target="_blank" rel="noreferrer">{p.productUrl?'Visa på Systembolaget':'Sök på Systembolaget'} <ArrowUpRight size={14}/></a>}
   </article>)}</section>
+ </div>;
+}
+
+// One drink at a time, from last place to the winner. Tap to continue.
+function RevealShow({rows,title,onDone}:{rows:any[];title:string;onDone:()=>void}){
+ const order=[...rows].reverse();const [i,setI]=useState(-1);const r=order[i];const place=rows.length-i;const last=i===order.length-1;
+ const next=()=>i<order.length-1?setI(i+1):onDone();
+ return <div className="reveal-show" onClick={next} role="button" tabIndex={0} onKeyDown={e=>{if(e.key==='Enter'||e.key===' '||e.key==='ArrowRight')next();if(e.key==='Escape')onDone();}}>
+  <button className="text-button reveal-skip" onClick={e=>{e.stopPropagation();onDone();}}>Hoppa över</button>
+  {i<0?<div className="reveal-card intro"><div className="eyebrow">AVSLÖJANDET</div><h2>{title}</h2><p>{rows.length} drycker. Vi börjar från botten.</p><span className="reveal-tap">Tryck för att börja <ChevronRight size={16}/></span></div>
+  :<div key={i} className={'reveal-card'+(last?' winner':'')}>
+   <div className="reveal-place">{last?<Trophy size={44}/>:<span>{place}</span>}<small>{last?'KVÄLLENS VINNARE':place===2?'TVÅA':place===3?'TREA':'PLATS '+place}</small></div>
+   {r.image&&<img src={productImage(r.image)} alt="" onError={e=>{e.currentTarget.style.display='none';}}/>}
+   <h2>{r.name}</h2><p>Prov {r.number}{r.price!=null?' · '+kr(r.price):''}</p>
+   <strong className="reveal-score">{fmt(r.average)}</strong>
+   <span className="reveal-tap">{last?'Tryck för alla resultat':'Nästa'} <ChevronRight size={16}/></span>
+  </div>}
+  <div className="reveal-dots">{order.map((_:any,k:number)=><span key={k} className={k<=i?'on':''}/>)}</div>
  </div>;
 }
