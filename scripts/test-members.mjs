@@ -28,7 +28,7 @@ p=await call(profile,'guest','/api/profile');assert.equal(p.upcoming.length,1);a
 await call(club,'boss','/api/club',{action:'join',id:t.id,token:t.token,name:'Boss'});
 await call(club,'boss','/api/club',{action:'vote',id:t.id,sample:'r1',vote:{score:7}});
 await call(club,'boss','/api/club',{action:'reveal',id:t.id});
-p=await call(profile,'boss','/api/profile?user=guest');assert.equal(p.tastings[0].samples[0].name,'Hemlig rom');assert.equal(p.tastings[0].samples[0].score,9);assert.equal(p.tastings[0].samples[0].average,8);assert.equal(p.stats.ratings,1);
+p=await call(profile,'boss','/api/profile?user=guest');assert.equal(p.tastings[0].samples[0].name,'Hemlig rom');assert.equal(p.tastings[0].samples[0].score,9);assert.equal(p.tastings[0].samples[0].average,8);assert.equal(p.stats.ratings,1);assert.ok('price' in p.tastings[0].samples[0]&&'volume' in p.tastings[0].samples[0]);
 
 // Historical archive names can be linked to a member by the admin.
 env.sqlite.prepare('INSERT INTO historical(id,data) VALUES(?,?)').run('h1',JSON.stringify({id:'h1',title:'Gammal ölkväll',date:'2020-10-29',samples:[{id:'h1s1',name:'Grandiose',type:'Lager',average:8.4,ratings:[{name:'Gäst',score:8,comment:'Fin'},{name:'Annan',score:9}]}]}));
