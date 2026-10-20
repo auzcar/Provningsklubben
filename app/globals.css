@@ -262,3 +262,6 @@ body:has(.test-bar){padding-top:40px}body:has(.test-bar) .tasting-mode,body:has(
 .rating-main{display:flex;flex-direction:column;flex:1;min-width:0}.rating-main b{font-weight:600}.rating-main small{color:var(--muted);font-size:12px}
 .rating-list .icon-button.on{background:#7a1f2c;color:#fbf6ec;border-color:#7a1f2c}
 .my-list{margin:12px 0 16px}.my-list .shopping-list li{justify-content:space-between}.my-list .shopping-list li>span{display:flex;flex-direction:column;flex:1;min-width:0}
+.rating-price{font-family:var(--serif);font-size:18px;font-weight:600;white-space:nowrap;text-align:right;min-width:64px}
+.price-range{display:inline-flex;align-items:center;gap:4px}.price-range input{width:84px}
+@media(max-width:760px){.rating-price{font-size:16px;min-width:52px}}
