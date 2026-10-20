@@ -1,22 +1,14 @@
 'use client';
-import {useEffect,useRef,useState} from 'react';
+import {useEffect,useState} from 'react';
 import {Trophy,Frown,Flame,PiggyBank,Users,Heart,Gavel,Sparkles,Star,Coins,MessageSquareQuote} from 'lucide-react';
 import {api} from '@/lib/client-api';
 import {categoryOrder} from '@/lib/drink-categories';
 import SbLink from './sb-link';
-import {priceEffect,holm,globalPriceEffect,type PricedDrink,type PriceEffect,type TypedDrink,type GlobalEffect} from '@/lib/stats-math';
+import {holm,globalPriceEffect,type TypedDrink,type GlobalEffect} from '@/lib/stats-math';
 
 const fmt=(n:any,d=1)=>n==null||!Number.isFinite(n)?'–':Number(n).toLocaleString('sv-SE',{minimumFractionDigits:d,maximumFractionDigits:d});
 const kr=(n:number)=>Math.round(n).toLocaleString('sv-SE')+' kr';
 const mean=(a:number[])=>a.length?a.reduce((x,y)=>x+y,0)/a.length:null;
-// Headline that only claims what the significant comparisons support.
-const verdict=(within:{p:number;slope:number},global:{p:number;slope:number}|null)=>{
- const sig=[within,global].filter((e):e is {p:number;slope:number}=>!!e&&e.p<0.05);
- if(!sig.length)return 'Inte så att det går att säga säkert.';
- if(sig.some(e=>e.slope>0)&&sig.some(e=>e.slope<0))return 'Det beror på hur man jämför.';
- const dir=sig[0].slope>0?'Ja, lite grann':'Tvärtom';
- return sig.length===2?dir+'!':dir+(sig[0]===within?', i alla fall inom samma kväll.':', sett över alla kvällar.');
-};
 const pf=(p:number)=>p<0.001?'< 0,001':fmt(p,3);
 type Effect={slope:number;low:number;high:number;p:number;n:number};
 type ForestRow={c:string;sub:string;e:Effect;adj?:number};
@@ -41,32 +33,6 @@ function Forest({unit,label,total,rows}:{unit:string;label:string;total:ForestRo
   <div className="forest-hint"><span>← lägre betyg</span><span>högre betyg →</span></div>
  </figure>;
 }
-// Scatter of every drink: price relative to its type (z) against score relative to its type.
-// The band shows the 95 % CI of the slope; the line passes through the origin since both are centred.
-function GlobalScatter({e,names}:{e:GlobalEffect;names:Map<string,string>}){
- const box=useRef<HTMLDivElement>(null);const [w,setW]=useState(600);const [hover,setHover]=useState<number|null>(null);
- useEffect(()=>{const el=box.current;if(!el)return;const ro=new ResizeObserver(([en])=>setW(Math.round(en.contentRect.width)));ro.observe(el);return()=>ro.disconnect();},[]);
- const h=Math.round(Math.min(320,Math.max(220,w*.5))),m={l:34,r:12,t:12,b:34},iw=w-m.l-m.r,ih=h-m.t-m.b;
- const X=Math.max(2.5,Math.ceil(Math.max(...e.points.map(p=>Math.abs(p.z)))*2)/2),Y=Math.min(4,Math.max(2,Math.ceil(Math.max(...e.points.map(p=>Math.abs(p.y))))));
- const sx=(v:number)=>m.l+(v+X)/(2*X)*iw,sy=(v:number)=>m.t+(Y-v)/(2*Y)*ih;
- const tri=(x:number)=>`${sx(0)},${sy(0)} ${sx(x)},${sy(e.low*x)} ${sx(x)},${sy(e.high*x)}`;
- const hp=hover==null?null:e.points[hover];
- return <figure className="scatter" ref={box}>
-  <svg width={w} height={h} role="img" aria-label={`Punktdiagram: ${e.n} drycker, pris mot betyg inom typ. Lutning ${fmt(e.slope,2)} poäng per standardavvikelse.`} onPointerLeave={()=>setHover(null)}>
-   <defs><clipPath id="scatter-clip"><rect x={m.l} y={m.t} width={iw} height={ih}/></clipPath></defs>
-   {[-2,-1,1,2].filter(v=>v<X).map(v=><line key={'x'+v} className="sc-grid" x1={sx(v)} x2={sx(v)} y1={m.t} y2={m.t+ih}/>)}
-   {Array.from({length:2*Y-1},(_,i)=>i-Y+1).filter(v=>v!==0).map(v=><line key={'y'+v} className="sc-grid" x1={m.l} x2={m.l+iw} y1={sy(v)} y2={sy(v)}/>)}
-   <line className="sc-zero" x1={sx(0)} x2={sx(0)} y1={m.t} y2={m.t+ih}/><line className="sc-zero" x1={m.l} x2={m.l+iw} y1={sy(0)} y2={sy(0)}/>
-   <g clipPath="url(#scatter-clip)"><polygon className="sc-band" points={tri(-X)}/><polygon className="sc-band" points={tri(X)}/>
-    {e.points.map((p,i)=><circle key={i} className={'sc-dot'+(hover===i?' on':'')} cx={sx(p.z)} cy={sy(Math.max(-Y,Math.min(Y,p.y)))} r={(hover===i?1.4:1)*(w<500?3.5:4.5)} onPointerEnter={()=>setHover(i)} onClick={()=>setHover(i)}/>)}
-    <line className="sc-fit" x1={sx(-X)} y1={sy(-X*e.slope)} x2={sx(X)} y2={sy(X*e.slope)}/></g>
-   {[-2,-1,0,1,2].filter(v=>Math.abs(v)<X).map(v=><text key={'tx'+v} className="sc-tick" x={sx(v)} y={m.t+ih+14} textAnchor="middle">{v>0?'+'+v:v===0?'0':'−'+-v}</text>)}
-   {Array.from({length:2*Y+1},(_,i)=>i-Y).filter(v=>v%(Y>2?2:1)===0).map(v=><text key={'ty'+v} className="sc-tick" x={m.l-6} y={sy(v)+4} textAnchor="end">{v>0?'+'+v:v===0?'0':'−'+-v}</text>)}
-   <text className="sc-axis" x={m.l} y={h-4}>← billigare än typens snitt</text><text className="sc-axis" x={m.l+iw} y={h-4} textAnchor="end">dyrare →</text>
-  </svg>
-  <figcaption className="muted fine">{hp?<><b>{names.get(hp.id||'')||'Namn saknas'}</b> ({hp.type}): {fmt(Math.abs(hp.z),1)} standardavvikelser {hp.z>=0?'dyrare':'billigare'} än typens snitt, betyg {hp.y>=0?'+':'−'}{fmt(Math.abs(hp.y),1)} mot typens snitt.</>:<>Varje prick är en dryck. Lodrätt: betyget jämfört med typens snitt. Linjen är sambandet och det skuggade området dess 95 % konfidensintervall. Peka på en prick för att se drycken.</>}</figcaption>
- </figure>;
-}
 const STOP=new Set('och att det som en är på för med av till den har inte men lite mer mycket så från var om kan ett jag du vi de ingen sig smakar smak luktar eftersmak typ än bra nästan'.split(' '));
 
 // Fun facts computed from the whole archive: imported history plus revealed tastings.
@@ -88,18 +54,13 @@ export default function Stats({archive}:{archive:any}){
  const contested=[...rated].sort((a,b)=>b.spread-a.spread).slice(0,3);
  const bargains=priced.filter((d:any)=>d.price>=50&&d.avg!=null&&d.scores.length>=2).map((d:any)=>({...d,value:d.avg/d.price*100})).sort((a:any,b:any)=>b.value-a.value).slice(0,3);
  // Is expensive better? Compared within each tasting, see lib/stats-math.ts.
- const pricedRows:PricedDrink[]=drinks.filter((d:any)=>d.avg!=null).map((d:any)=>({group:d.sessionId,price:d.price,volume:d.volume,avg:d.avg,category:d.category}));
- const overall=priceEffect(pricedRows,5000);
  // Global comparison: price standardised within each type (beer and wine split by style).
  const typeOf=(d:any)=>(d.category==='Öl'||d.category==='Vin')&&d.subcategory?d.subcategory:d.category;
- const typedRows:TypedDrink[]=drinks.filter((d:any)=>d.avg!=null).map((d:any)=>({session:d.sessionId,type:typeOf(d),price:d.price,volume:d.volume,avg:d.avg,id:d.sessionId+':'+d.id}));
- const drinkNames=new Map<string,string>(drinks.map((d:any)=>[d.sessionId+':'+d.id,d.name]));
+ const typedRows:TypedDrink[]=drinks.filter((d:any)=>d.avg!=null).map((d:any)=>({session:d.sessionId,type:typeOf(d),price:d.price,volume:d.volume,avg:d.avg}));
  const global=globalPriceEffect(typedRows);
  // Per type the same model on one type at a time; needs drinks from at least three tastings.
  const typeEffects=[...new Set(typedRows.map(r=>r.type))].map(t=>({c:t,e:globalPriceEffect(typedRows.filter(r=>r.type===t))})).filter(x=>x.e).sort((a,b)=>b.e!.n-a.e!.n) as {c:string;e:GlobalEffect}[];
  const typeHolm=holm(typeEffects.map(x=>x.e.p));
- const catEffects=byCat.map(c=>({c:c.c,e:priceEffect(pricedRows.filter(r=>r.category===c.c))})).filter(x=>x.e&&x.e.df>=4) as {c:string;e:PriceEffect}[];
- const holmP=holm(catEffects.map(x=>x.e.p));
  const names=[...new Set<string>(drinks.flatMap((d:any)=>d.ratings.map((v:any)=>v.name)))];
  const people=names.map(n=>{
   const mine:{score:number;cat:string;sessionId:string}[]=drinks.flatMap((d:any)=>d.ratings.filter((v:any)=>v.name===n&&v.score!=null&&!v.skip).map((v:any)=>({score:v.score,cat:d.category,sessionId:d.sessionId})));
@@ -141,32 +102,19 @@ export default function Stats({archive}:{archive:any}){
    <section className="stat-card"><h2><PiggyBank size={20}/>Fynden</h2><p className="muted">Flest poäng per hundralapp, flaskor från 50 kr.</p><ol className="fact-list">{bargains.map((d:any)=><li key={d.id}><span><b>{d.name} <SbLink drink={d}/></b><small>{kr(d.price)} · snitt {fmt(d.avg)}</small></span><em>{fmt(d.value,2)}<small> p/100 kr</small></em></li>)}</ol></section>
 
    <section className="stat-card wide"><h2><Coins size={20}/>Är dyrare godare?</h2>
-    {!overall?<p className="big-claim">För lite prisdata ännu.</p>:<>
-    <p className="big-claim">{verdict(overall,global)} Två sätt att jämföra, båda med priset satt i relation till liknande drycker.</p>
-    {global&&<><h3 className="effect-title">Alla provningar, pris standardiserat inom dryckestyp</h3>
-    <p>En flaska som är <b>en standardavvikelse dyrare än normalt för sin typ</b> får i snitt <b>{global.slope>=0?'+':''}{fmt(global.slope,2)} poäng</b> jämfört med typens snitt. {global.p<0.05?'Sambandet håller över alla kvällar.':'Över alla kvällar är sambandet för osäkert för en säker slutsats.'}</p>
+    {!global?<p className="big-claim">För lite prisdata ännu.</p>:<>
+    <p className="big-claim">{global.p<0.05?(global.slope>0?'Ja, lite grann.':'Tvärtom!'):'Inte så att det går att säga säkert.'} En flaska som är <b>en standardavvikelse dyrare än normalt för sin typ</b> får i snitt <b>{global.slope>=0?'+':''}{fmt(global.slope,2)} poäng</b> jämfört med typens snitt.</p>
     <div className="effect-facts">
      <div><b>{fmt(global.low,2)} till {fmt(global.high,2)}</b><span>95 % konfidensintervall</span></div>
      <div><b>p = {pf(global.p)}</b><span>klustrade standardfel per provning</span></div>
      <div><b>r = {fmt(global.r,2)}</b><span>partiell korrelation</span></div>
      <div><b>{global.n} drycker</b><span>i {global.types} typer, {global.clusters} provningar</span></div>
     </div>
-    <GlobalScatter e={global} names={drinkNames}/>
     <Forest unit="poäng per standardavvikelse i pris inom typen" label="Effekt av pris inom dryckestyp" total={{c:'Alla typer',sub:`${global.types} typer`,e:global}} rows={typeEffects.map((x,i)=>({c:x.c,sub:`${x.e.clusters} provningar`,e:x.e,adj:typeHolm[i]}))}/>
-    <p className="muted fine">Typerna är kategorierna, men öl och vin delas upp per stil (lager, IPA, rött, vitt och så vidare). En dyr lager och en dyr cognac hamnar därmed på samma skala. Typer visas var för sig när de provats under minst tre kvällar.</p></>}
-    <h3 className="effect-title">Inom samma provning</h3>
-    <p>En flaska som kostar dubbelt så mycket som en annan samma kväll får i snitt <b>{overall.slope>=0?'+':''}{fmt(overall.slope,2)} poäng</b> mer. Samma jury och samma kväll, så det är det strängaste testet.</p>
-    <div className="effect-facts">
-     <div><b>{fmt(overall.low,2)} till {fmt(overall.high,2)}</b><span>95 % konfidensintervall</span></div>
-     <div><b>p = {pf(overall.p)}</b><span>t-test{overall.permP!=null?`, permutation p = ${pf(overall.permP)}`:''}</span></div>
-     <div><b>r = {fmt(overall.r,2)}</b><span>partiell korrelation</span></div>
-     <div><b>{overall.n} drycker</b><span>i {overall.groups} provningar</span></div>
-    </div>
-    <Forest unit="poäng per dubblat pris" label="Effekt av dubblat pris per kategori" total={{c:'Alla',sub:`${overall.groups} provningar`,e:overall}} rows={catEffects.map((x,i)=>({c:x.c,sub:`${x.e.n} drycker`,e:x.e,adj:holmP[i]}))}/>
     <details className="method"><summary>Hur räknar vi?</summary>
-     <p>Priserna skiljer sig enormt mellan dryckestyper, så en cognac kan inte jämföras med en öl. Därför jämförs varje dryck bara med de andra dryckerna i samma provning: samma kväll, samma jury och nästan alltid samma typ. Det tar också bort skillnader i hur generösa olika kvällar var.</p>
-     <p>Priset räknas per liter när volymen är känd och på en logaritmisk skala, så att ett steg alltid betyder att priset fördubblas. Pris och snittbetyg centreras inom varje provning, och betyget regresseras på priset (en så kallad fixed effects-modell). Samma flaska serverad på två sätt, till exempel ren och i G&amp;T, finns med en gång per servering.</p>
-     <p>p-värdet kommer från ett t-test och kontrolleras med ett permutationstest där priserna blandas slumpvis inom varje provning, utan antagande om normalfördelning. Kategorierna testas var för sig, och deras p-värden är Holm-justerade för att flera test görs samtidigt. Ifylld prick betyder p &lt; 0,05 efter justering. Den globala jämförelsen standardiserar i stället priset inom varje dryckestyp (z-värde av log-literpris; saknad volym ersätts med typens medianvolym) och jämför betyget med typens snitt, så att alla provningar kan vägas samman. Eftersom drycker från samma kväll delar jury och humör är de inte oberoende, därför används klusterrobusta standardfel per provning (t-fördelning med antal provningar minus ett frihetsgrader). Typer med färre än fem prissatta drycker räknas inte. Drycker utan pris eller betyg och provningar med bara en prissatt dryck räknas inte.</p>
+     <p>Priserna skiljer sig enormt mellan dryckestyper, så en cognac kan inte jämföras med en öl i kronor. Därför standardiseras priset inom varje dryckestyp: whisky mot whisky, cognac mot cognac, lager mot lager. Typerna är kategorierna, men öl och vin delas upp per stil (lager, IPA, rött, vitt och så vidare). En dyr lager och en dyr cognac hamnar därmed på samma skala.</p>
+     <p>Priset räknas per liter (saknad volym ersätts med typens medianvolym) och på en logaritmisk skala, och görs om till ett z-värde inom typen: hur många standardavvikelser dyrare eller billigare än typens snitt flaskan är. Betyget jämförs med typens snitt, och betyget regresseras på z-värdet.</p>
+     <p>Drycker från samma kväll delar jury och humör och är inte oberoende, därför används klusterrobusta standardfel per provning (t-fördelning med antal provningar minus ett frihetsgrader). Typer med färre än fem prissatta drycker räknas inte, och i diagrammet visas en typ för sig först när den provats under minst tre kvällar. Typernas p-värden är Holm-justerade för att flera test görs samtidigt; ifylld markör betyder p &lt; 0,05.</p>
     </details></>}
    </section>
 
