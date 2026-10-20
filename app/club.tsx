@@ -52,8 +52,11 @@ export default function Club({me:signedIn,signOut}:{me:Me|null;signOut?:()=>void
  const people=[...new Set<string>(allRows.flatMap((p:any)=>p.ratings.map((v:any)=>v.name)))].sort();const types=categoryOrder.filter(c=>allRows.some((p:any)=>p.category===c));const subtypes=[...new Set<string>(allRows.filter((p:any)=>p.category===type).map((p:any)=>p.subcategory).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'sv'));
  const filtered=allRows.map((p:any)=>({...p,shownScore:person?p.ratings.find((v:any)=>v.name===person)?.score:p.average})).filter((p:any)=>(!q||[p.name,p.type,p.article,p.comment,p.session,p.serving,...p.ratings.map((v:any)=>v.comment)].join(' ').toLocaleLowerCase('sv').includes(q.toLocaleLowerCase('sv')))&&(!person||p.shownScore!=null)&&(!type||p.category===type)&&(!subtype||p.subcategory===subtype)&&(!event||p.sessionId===event)&&(!min||p.shownScore!=null&&p.shownScore>=Number(min))&&(!incomplete||!p.name||!(p.price>0)||!(p.volume>0))).sort((a:any,b:any)=>categoryOrder.indexOf(a.category)-categoryOrder.indexOf(b.category)||(a.category==='Öl'&&b.category==='Öl'?beerGroupOrder.indexOf(a.subcategory)-beerGroupOrder.indexOf(b.subcategory):0)||(sort==='score'?(b.shownScore??-1)-(a.shownScore??-1):sort==='price'?(a.price??Infinity)-(b.price??Infinity):sort==='name'?a.name.localeCompare(b.name,'sv'):(b.date||'').localeCompare(a.date||'')));
  const active=list.filter(s=>s.status!=='revealed');
- // The home hero leads to the tasting that matters now: one in progress, else the next planned (dated ones first).
- const next=active.find(s=>s.status==='active')||[...active].sort((a,b)=>(a.date||'9999').localeCompare(b.date||'9999'))[0];
+ // The home hero leads to the tasting that matters now: one in progress, else the next planned one.
+ // Upcoming dates come first (soonest first), then undated drafts, then drafts whose date has passed.
+ const today=new Date().toISOString().slice(0,10);
+ const rank=(s:any)=>!s.date?[1,'']:s.date>=today?[0,s.date]:[2,s.date];
+ const next=active.find(s=>s.status==='active')||[...active].sort((a,b)=>{const x=rank(a),y=rank(b);return x[0]!==y[0]?(x[0] as number)-(y[0] as number):x[0]===2?String(y[1]).localeCompare(String(x[1])):String(x[1]).localeCompare(String(y[1]));})[0];
  const others=active.filter(s=>s!==next);
  const formatDay=(d:string)=>{const t=new Date(d+'T12:00:00');return isNaN(+t)?d:t.toLocaleDateString('sv-SE',{weekday:'long',day:'numeric',month:'long'});};
  // Past tastings from the archive that are not already in your own list above.
