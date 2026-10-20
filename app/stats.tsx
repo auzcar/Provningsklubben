@@ -4,7 +4,7 @@ import {Trophy,Frown,Flame,PiggyBank,Users,Heart,Gavel,Sparkles,Star,Coins,Messa
 import {api} from '@/lib/client-api';
 import {categoryOrder} from '@/lib/drink-categories';
 import SbLink from './sb-link';
-import {priceEffect,holm,type PricedDrink,type PriceEffect} from '@/lib/stats-math';
+import {priceEffect,holm,globalPriceEffect,type PricedDrink,type PriceEffect} from '@/lib/stats-math';
 
 const fmt=(n:any,d=1)=>n==null||!Number.isFinite(n)?'–':Number(n).toLocaleString('sv-SE',{minimumFractionDigits:d,maximumFractionDigits:d});
 const kr=(n:number)=>Math.round(n).toLocaleString('sv-SE')+' kr';
@@ -32,6 +32,9 @@ export default function Stats({archive}:{archive:any}){
  // Is expensive better? Compared within each tasting, see lib/stats-math.ts.
  const pricedRows:PricedDrink[]=drinks.filter((d:any)=>d.avg!=null).map((d:any)=>({group:d.sessionId,price:d.price,volume:d.volume,avg:d.avg,category:d.category}));
  const overall=priceEffect(pricedRows,5000);
+ // Global comparison: price standardised within each type (beer and wine split by style).
+ const typeOf=(d:any)=>(d.category==='Öl'||d.category==='Vin')&&d.subcategory?d.subcategory:d.category;
+ const global=globalPriceEffect(drinks.filter((d:any)=>d.avg!=null).map((d:any)=>({session:d.sessionId,type:typeOf(d),price:d.price,volume:d.volume,avg:d.avg})));
  const catEffects=byCat.map(c=>({c:c.c,e:priceEffect(pricedRows.filter(r=>r.category===c.c))})).filter(x=>x.e&&x.e.df>=4) as {c:string;e:PriceEffect}[];
  const holmP=holm(catEffects.map(x=>x.e.p));
  const span=Math.min(4,Math.max(1,...catEffects.flatMap(x=>[Math.abs(x.e.low),Math.abs(x.e.high)])));
@@ -86,6 +89,10 @@ export default function Stats({archive}:{archive:any}){
      <div><b>r = {fmt(overall.r,2)}</b><span>partiell korrelation</span></div>
      <div><b>{overall.n} drycker</b><span>i {overall.groups} provningar</span></div>
     </div>
+    {global&&<div className="global-effect"><h3 className="effect-title">Globalt, inom dryckestyp</h3>
+     <p>Över alla {global.clusters} provningar: en flaska som är <b>en standardavvikelse dyrare än normalt för sin typ</b> får i snitt <b>{global.slope>=0?'+':''}{fmt(global.slope,2)} poäng</b> (95 % KI {fmt(global.low,2)} till {fmt(global.high,2)}, p = {pf(global.p)}). {global.p<0.05?'Det håller även över alla kvällar.':'Över alla kvällar är sambandet för osäkert för en säker slutsats.'}</p>
+     <p className="muted fine">{global.n} drycker i {global.types} typer, klustrade standardfel per provning. Lager och IPA, rött och vitt vin och så vidare räknas som egna typer.</p>
+    </div>}
     {catEffects.length>0&&<><h3 className="effect-title">Per kategori</h3><p className="muted fine">Poäng per dubblat pris med 95 % konfidensintervall. Strecket i mitten är noll, alltså inget samband.</p>
     <div className="forest" role="table" aria-label="Effekt av dubblat pris per kategori">{catEffects.map((x,i)=><div className="forest-row" role="row" key={x.c} title={`${x.c}: ${fmt(x.e.slope,2)} poäng per dubblat pris (95 % KI ${fmt(x.e.low,2)} till ${fmt(x.e.high,2)}), p = ${pf(x.e.p)}, Holm-justerat p = ${pf(holmP[i])}, ${x.e.n} drycker`}>
      <span role="cell" className="forest-label">{x.c}<small>{x.e.n} drycker</small></span>
@@ -96,7 +103,7 @@ export default function Stats({archive}:{archive:any}){
     <details className="method"><summary>Hur räknar vi?</summary>
      <p>Priserna skiljer sig enormt mellan dryckestyper, så en cognac kan inte jämföras med en öl. Därför jämförs varje dryck bara med de andra dryckerna i samma provning: samma kväll, samma jury och nästan alltid samma typ. Det tar också bort skillnader i hur generösa olika kvällar var.</p>
      <p>Priset räknas per liter när volymen är känd och på en logaritmisk skala, så att ett steg alltid betyder att priset fördubblas. Pris och snittbetyg centreras inom varje provning, och betyget regresseras på priset (en så kallad fixed effects-modell). Samma flaska serverad på två sätt, till exempel ren och i G&amp;T, finns med en gång per servering.</p>
-     <p>p-värdet kommer från ett t-test och kontrolleras med ett permutationstest där priserna blandas slumpvis inom varje provning, utan antagande om normalfördelning. Kategorierna testas var för sig, och deras p-värden är Holm-justerade för att flera test görs samtidigt. Ifylld prick betyder p &lt; 0,05 efter justering. Drycker utan pris eller betyg och provningar med bara en prissatt dryck räknas inte.</p>
+     <p>p-värdet kommer från ett t-test och kontrolleras med ett permutationstest där priserna blandas slumpvis inom varje provning, utan antagande om normalfördelning. Kategorierna testas var för sig, och deras p-värden är Holm-justerade för att flera test görs samtidigt. Ifylld prick betyder p &lt; 0,05 efter justering. Den globala jämförelsen standardiserar i stället priset inom varje dryckestyp (z-värde av log-literpris; saknad volym ersätts med typens medianvolym) och jämför betyget med typens snitt, så att alla provningar kan vägas samman. Eftersom drycker från samma kväll delar jury och humör är de inte oberoende, därför används klusterrobusta standardfel per provning (t-fördelning med antal provningar minus ett frihetsgrader). Typer med färre än fem prissatta drycker räknas inte. Drycker utan pris eller betyg och provningar med bara en prissatt dryck räknas inte.</p>
     </details></>}
    </section>
 
