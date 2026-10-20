@@ -2,12 +2,19 @@
 import {useEffect,useRef,useState} from 'react';
 import {Wine,LoaderCircle} from 'lucide-react';
 import Club from './club';
-import {authHeaders,loadClerk,setTokenSource} from '@/lib/client-auth';
+import {authHeaders,loadClerk,setTokenSource,setTestUser,testUser} from '@/lib/client-auth';
 
-export type Me={id:string;name:string;admin:boolean;avatar:number};
+export type Me={id:string;name:string;admin:boolean;avatar:number;tester?:boolean};
 type State={phase:'loading'|'signin'|'blocked'|'ready'|'error';mode?:string;me?:Me|null;message?:string};
 
-async function session():Promise<any>{const r=await fetch('/api/session',{headers:await authHeaders(),cache:'no-store'});return {status:r.status,...(await r.json() as object)};}
+async function session():Promise<any>{
+ const r=await fetch('/api/session',{headers:await authHeaders(),cache:'no-store'});const d={status:r.status,...(await r.json() as object)};
+ // A test person the server refuses (not admin, or test data removed) falls back to the real account.
+ if(r.status===403&&testUser()){setTestUser(null);return session();}
+ return d;
+}
+// ?testas=<id> opens a tab directly as a test person (test mode's "open in new tab").
+if(typeof window!=='undefined'){const u=new URL(location.href),t=u.searchParams.get('testas');if(t){setTestUser(t);u.searchParams.delete('testas');history.replaceState(null,'',u.pathname+u.search+u.hash);}}
 
 // Clerk mode: nothing loads until Clerk has signed the member in and the server
 // accepts the token. Sign-up only works through an invitation link (Restricted mode in Clerk).

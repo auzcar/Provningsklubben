@@ -1,4 +1,5 @@
 import {verifyToken,createClerkClient} from '@clerk/backend';
+import {isTestUser} from '@/lib/test-users';
 
 // Server-side identity and club membership. Every API route calls requireMember();
 // the client never decides who it is.
@@ -9,7 +10,8 @@ import {verifyToken,createClerkClient} from '@clerk/backend';
 // oai-authenticated-user-* headers. Only safe behind a gateway that strips
 // client-supplied copies (Sites production, or the loopback-only dev mock).
 export type AuthEnv={DB?:D1Database;AUTH_MODE?:string;CLERK_PUBLISHABLE_KEY?:string;CLERK_SECRET_KEY?:string;CLERK_JWT_KEY?:string;ADMIN_EMAILS?:string};
-export type Member={id:string;name:string;email:string;role:string;admin:boolean;envAdmin:boolean;avatarVersion:number};
+// tester: the real admin behind a test user (see lib/test-users.ts).
+export type Member={id:string;name:string;email:string;role:string;admin:boolean;envAdmin:boolean;avatarVersion:number;tester?:string};
 export class AuthError extends Error{status:number;constructor(message:string,status=401){super(message);this.status=status;}}
 export const SIGNED_OUT='Logga in för att använda klubben.';
 
@@ -44,8 +46,11 @@ async function details(env:AuthEnv,who:{id:string;email?:string;name?:string}){
  return {name:[u.firstName,u.lastName].filter(Boolean).join(' ')||u.username||email.split('@')[0]||'Medlem',email};
 }
 
-export async function findMember(r:Request,env:AuthEnv):Promise<Member|null>{
+// X-Test-User asks to act as a test user. It is honoured only for a verified admin and only
+// for test users, so it can never reach a real member's identity or grant admin rights.
+export async function findMember(r:Request,env:AuthEnv,{ignoreTest=false}={}):Promise<Member|null>{
  const who=await identify(r,env);if(!who)return null;
+ if(isTestUser(who.id))throw new AuthError('Ogiltig identitet.',403);
  const db=env.DB;if(!db)throw new AuthError('Databasen är inte tillgänglig.',500);
  let row:any=await db.prepare('SELECT * FROM profiles WHERE user=?').bind(who.id).first();
  if(!row){
@@ -55,11 +60,15 @@ export async function findMember(r:Request,env:AuthEnv):Promise<Member|null>{
  }
  if(row.status!=='active')throw new AuthError('Ditt medlemskap är inaktiverat. Kontakta klubbens administratör.',403);
  const envAdmin=isEnvAdmin(env,row.email);
- return {id:row.user,name:row.name,email:row.email,role:row.role,admin:envAdmin||row.role==='admin',envAdmin,avatarVersion:row.avatar_version};
+ const me={id:row.user,name:row.name,email:row.email,role:row.role,admin:envAdmin||row.role==='admin',envAdmin,avatarVersion:row.avatar_version};
+ const test=ignoreTest?null:r.headers.get('x-test-user');if(!test)return me;
+ if(!me.admin)throw new AuthError('Endast administratören kan använda testläget.',403);
+ const t:any=isTestUser(test)?await db.prepare('SELECT * FROM profiles WHERE user=?').bind(test).first():null;if(!t)throw new AuthError('Testpersonen finns inte. Starta testläget igen.',403);
+ return {id:t.user,name:t.name,email:'',role:'member',admin:false,envAdmin:false,avatarVersion:t.avatar_version,tester:me.id};
 }
 
 export async function requireMember(r:Request,env:AuthEnv){const m=await findMember(r,env);if(!m)throw new AuthError(SIGNED_OUT);return m;}
-export async function requireAdmin(r:Request,env:AuthEnv){const m=await requireMember(r,env);if(!m.admin)throw new AuthError('Endast administratören kan göra detta.',403);return m;}
+export async function requireAdmin(r:Request,env:AuthEnv,opts={}){const m=await findMember(r,env,opts);if(!m)throw new AuthError(SIGNED_OUT);if(!m.admin)throw new AuthError('Endast administratören kan göra detta.',403);return m;}
 
 export function sameOrigin(r:Request){const o=r.headers.get('origin');return !o||o===new URL(r.url).origin;}
 export function reply(data:any,status=200){return Response.json(data,{status,headers:{'Cache-Control':'no-store'}});}

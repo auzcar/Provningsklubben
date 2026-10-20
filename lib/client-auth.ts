@@ -2,7 +2,12 @@
 // token; the server verifies it. In gateway mode the gateway adds identity itself.
 let tokenSource:()=>Promise<string|null>=async()=>null;
 export function setTokenSource(fn:()=>Promise<string|null>){tokenSource=fn;}
-export async function authHeaders():Promise<Record<string,string>>{const t=await tokenSource();return t?{Authorization:'Bearer '+t}:{};}
+// Admin test mode (app/test-mode.tsx): the chosen test person is kept per tab. The server
+// only honours it for a verified admin and only for test users.
+const TEST_KEY='testUser';
+export function testUser(){try{return sessionStorage.getItem(TEST_KEY);}catch{return null;}}
+export function setTestUser(id:string|null){try{if(id)sessionStorage.setItem(TEST_KEY,id);else sessionStorage.removeItem(TEST_KEY);}catch{}}
+export async function authHeaders():Promise<Record<string,string>>{const t=await tokenSource(),test=testUser();return {...(t?{Authorization:'Bearer '+t}:{}),...(test?{'X-Test-User':test}:{})};}
 
 // Clerk serves its browser bundles from the instance's Frontend API, encoded in the publishable key.
 const CLERK_JS='@clerk/clerk-js@6/dist/clerk.browser.js',CLERK_UI='@clerk/ui@1/dist/ui.browser.js';

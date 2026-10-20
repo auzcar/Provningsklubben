@@ -8,7 +8,7 @@ Claude, Claude Code, ChatGPT/Codex, Gemini och Antigravity.
 - Teknikstack: React 19, TypeScript, Vinext/Vite, Tailwind CSS, Cloudflare Workers/D1 och Drizzle.
 - Gränssnitt: `app/club.tsx` (provningsläget i `app/tasting-mode.tsx`, avslöjandet i `app/results.tsx`, statistiken i `app/stats.tsx` med prisanalysen i `lib/stats-math.ts`, Swish i `app/swish.tsx`), styling: `app/globals.css` (stilen "mellanläget" ligger sist i filen; ljus variant under `[data-theme=light]`, växlas i `app/theme-toggle.tsx`), API: `app/api/`.
 - Validering och blindning: `lib/model.ts`. Dryckeskategorier: `lib/drink-categories.ts`.
-- Inloggning och medlemskap: `lib/auth.ts` (Clerk eller Sites-gateway, styrs av `AUTH_MODE`). Profiler: `lib/profiles.ts`, `app/profile.tsx`, `app/members.tsx`. Se `docs/AUTH.md`.
+- Inloggning och medlemskap: `lib/auth.ts` (Clerk eller Sites-gateway, styrs av `AUTH_MODE`). Profiler: `lib/profiles.ts`, `app/profile.tsx`, `app/members.tsx`. Testläge för admin: `lib/test-users.ts`, `app/test-mode.tsx`. Se `docs/AUTH.md`.
 - Schema: `db/`. Migrationer: `drizzle/`. Resurser: `public/` och `vendor/`.
 - `build/` innehåller underhållen källkod. Genererat byggresultat ligger i `dist/`.
 - Installation: Node.js 24 och pnpm 11.25.0, sedan `pnpm install --frozen-lockfile`.

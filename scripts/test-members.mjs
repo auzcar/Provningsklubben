@@ -93,6 +93,42 @@ assert.equal((await call(club,'boss','/api/club?id=t-old')).host,true);
 res=await call(imp,'boss','/api/import',[JSON.parse(backup.tables.historical[0].data)]);assert.equal(res.historical,0);
 assert.equal((await call(history,'guest','/api/history')).sessions.filter(x=>x.title==='Ginkväll').length,1);
 
+// Test mode: only an admin can act as a test user, only as a test user, and test data stays apart.
+const as=(id)=>({'X-Test-User':id});
+await call(members,'guest','/api/members',{action:'test-setup'},403);
+await call(members,'boss','/api/members',{action:'test-setup'});
+await call(session,'guest','/api/session',undefined,403,as('test:host'));
+await call(session,'boss','/api/session',undefined,403,as('guest'));
+await call(session,'boss','/api/session',undefined,403,as('test:nobody'));
+await call(session,'test:host','/api/session',undefined,403);
+s=await call(session,'boss','/api/session',undefined,200,as('test:host'));assert.equal(s.me.id,'test:host');assert.equal(s.me.admin,false);assert.equal(s.me.tester,true);
+await call(members,'boss','/api/members',{action:'update',user:'guest',role:'admin'},403,as('test:host'));
+list=await call(members,'boss','/api/members',undefined,200,as('test:1'));assert.deepEqual(list.members.map(m=>m.id).sort(),['test:1','test:2','test:3','test:host']);
+assert.ok(!(await call(members,'boss','/api/members')).members.some(m=>m.id.startsWith('test:')));
+let tt=await call(club,'boss','/api/club',{action:'create',title:'Testkväll'},200,as('test:host'));
+const tplan={theme:'',notes:'',budget:null,expected:[],samples:[{id:'x1',name:'Testgin',number:1,type:'Gin',price:300}]};
+await call(club,'boss','/api/club',{action:'save',id:tt.id,version:tt.version,title:'Testkväll',plan:{...tplan,participants:['test:host','guest']}},400,as('test:host'));
+tt=await call(club,'boss','/api/club',{action:'save',id:tt.id,version:tt.version,title:'Testkväll',plan:{...tplan,participants:['test:host','test:1','test:2']}},200,as('test:host'));
+tt=await call(club,'boss','/api/club',{action:'start',id:tt.id},200,as('test:host'));
+await call(club,'guest','/api/club',{action:'join',id:tt.id,token:tt.token,name:'Gäst'},400);
+await call(club,'boss','/api/club',{action:'test-fill',id:tt.id},400,as('test:1'));
+await call(club,'boss','/api/club',{action:'vote',id:tt.id,sample:'x1',vote:{score:7}},200,as('test:1'));
+tt=await call(club,'boss','/api/club',{action:'test-fill',id:tt.id},200,as('test:host'));
+assert.equal(tt.progress.length,3);
+tt=await call(club,'boss','/api/club',{action:'reveal',id:tt.id},200,as('test:host'));assert.equal(tt.status,'revealed');
+assert.equal(tt.results.find(v=>v.name==='Testa Testsson').score,7);
+assert.ok((await call(history,'boss','/api/history',undefined,200,as('test:2'))).sessions.some(x=>x.title==='Testkväll'));
+assert.ok(!(await call(history,'guest','/api/history')).sessions.some(x=>x.title==='Testkväll'));
+assert.ok(!(await call(club,'boss','/api/club')).sessions.some(x=>x.title==='Testkväll'));
+// A real tasting cannot take test users.
+let real=await call(club,'boss','/api/club',{action:'create',title:'Riktig'});
+await call(club,'boss','/api/club',{action:'save',id:real.id,version:real.version,title:'Riktig',plan:{...tplan,participants:['boss','test:1']}},400);
+await call(club,'boss','/api/club',{action:'delete',id:real.id});
+await call(members,'boss','/api/members',{action:'test-reset'},200,as('test:host'));
+await call(session,'boss','/api/session',undefined,403,as('test:host'));
+for(const t of ['profiles','members','ratings'])assert.equal(env.sqlite.prepare(`SELECT COUNT(*) n FROM ${t} WHERE user LIKE 'test:%'`).get().n,0);
+assert.equal(env.sqlite.prepare("SELECT COUNT(*) n FROM tastings WHERE owner LIKE 'test:%'").get().n,0);
+
 // Clerk mode: identity headers are ignored; only a valid session token for this origin counts.
 const {privateKey,publicKey}=generateKeyPairSync('rsa',{modulusLength:2048});
 const jwtKey=publicKey.export({type:'spki',format:'pem'}).toString();
@@ -108,4 +144,4 @@ await call(club,null,'/api/club',undefined,401,{Authorization:'Bearer '+token({a
 await call(club,null,'/api/club',undefined,401,{Authorization:'Bearer '+token({exp:Math.floor(Date.now()/1000)-120})});
 await call(club,null,'/api/club',undefined,401,{Authorization:'Bearer '+token().slice(0,-4)+'AAAA'});
 await call(club,null,'/api/club',undefined,200,{Authorization:'Bearer '+token()});
-console.log('PASS: membership, admin rules, removal, profiles without premature disclosure, archive linking, avatar validation, participants, cost split, Swish, deletion, backup import, Clerk token verification.');
+console.log('PASS: membership, admin rules, removal, profiles without premature disclosure, archive linking, avatar validation, participants, cost split, Swish, deletion, backup import, admin test mode isolation, Clerk token verification.');
