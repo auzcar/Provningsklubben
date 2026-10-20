@@ -157,6 +157,15 @@ await call(club,'boss','/api/club?id='+gk.id,undefined,400);
 await call(club,'guest','/api/club',{action:'reveal',id:gk.id});
 assert.equal((await call(club,'boss','/api/club?id='+gk.id)).status,'revealed');
 await call(club,'stranger','/api/club?id='+gk.id,undefined,400);
+// Admin can complete archive data; nobody else can, and scores stay as they were.
+await call(history,'guest','/api/history',{action:'edit',session:'h2',sample:'g1',fields:{price:399}},403);
+await call(history,'boss','/api/history',{action:'edit',session:'h2',sample:'g1',fields:{productUrl:'https://evil.test/x'}},400);
+await call(history,'boss','/api/history',{action:'edit',session:'h2',sample:'g1',fields:{price:'399',volume:70,name:'Hendrick\'s Gin',score:1}});
+let gin=(await call(history,'guest','/api/history')).sessions.find(x=>x.id==='h2').samples.find(x=>x.id==='g1');
+assert.equal(gin.price,399);assert.equal(gin.volume,70);assert.equal(gin.name,"Hendrick's Gin");assert.equal(gin.ratings[0].score,7);
+await call(history,'boss','/api/history',{action:'edit',session:gk.id,sample:'q1',fields:{article:'12345',price:250}});
+assert.equal((await call(history,'guest','/api/history')).sessions.find(x=>x.id===gk.id).samples[0].price,250);
+
 // Restore uses one statement per chunk, not per row (D1 allows 50 queries per request on the free plan).
 const many={format:2,tables:{ratings:Array.from({length:600},(_,i)=>({session:'bulk',user:'u'+i,sample:'s',data:'{"score":5}'}))}};
 let statements=0;const batch=env.DB.batch;env.DB.batch=async a=>{statements+=a.length;return batch(a);};
@@ -180,4 +189,4 @@ await call(club,null,'/api/club',undefined,401,{Authorization:'Bearer '+token({a
 await call(club,null,'/api/club',undefined,401,{Authorization:'Bearer '+token({exp:Math.floor(Date.now()/1000)-120})});
 await call(club,null,'/api/club',undefined,401,{Authorization:'Bearer '+token().slice(0,-4)+'AAAA'});
 await call(club,null,'/api/club',undefined,200,{Authorization:'Bearer '+token()});
-console.log('PASS: membership, admin rules, removal, profiles without premature disclosure, archive linking, avatar validation, participants, cost split, Swish, deletion, backup import, admin test mode isolation, full backup and restore, admin removal of revealed tastings, Clerk token verification.');
+console.log('PASS: membership, admin rules, removal, profiles without premature disclosure, archive linking, avatar validation, participants, cost split, Swish, deletion, backup import, admin test mode isolation, full backup and restore, admin removal of revealed tastings, admin archive editing, Clerk token verification.');
