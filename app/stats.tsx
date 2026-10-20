@@ -9,6 +9,14 @@ import {priceEffect,holm,globalPriceEffect,type PricedDrink,type PriceEffect} fr
 const fmt=(n:any,d=1)=>n==null||!Number.isFinite(n)?'–':Number(n).toLocaleString('sv-SE',{minimumFractionDigits:d,maximumFractionDigits:d});
 const kr=(n:number)=>Math.round(n).toLocaleString('sv-SE')+' kr';
 const mean=(a:number[])=>a.length?a.reduce((x,y)=>x+y,0)/a.length:null;
+// Headline that only claims what the significant comparisons support.
+const verdict=(within:{p:number;slope:number},global:{p:number;slope:number}|null)=>{
+ const sig=[within,global].filter((e):e is {p:number;slope:number}=>!!e&&e.p<0.05);
+ if(!sig.length)return 'Inte så att det går att säga säkert.';
+ if(sig.some(e=>e.slope>0)&&sig.some(e=>e.slope<0))return 'Det beror på hur man jämför.';
+ const dir=sig[0].slope>0?'Ja, lite grann':'Tvärtom';
+ return sig.length===2?dir+'!':dir+(sig[0]===within?', i alla fall inom samma kväll.':', sett över alla kvällar.');
+};
 const STOP=new Set('och att det som en är på för med av till den har inte men lite mer mycket så från var om kan ett jag du vi de ingen sig smakar smak luktar eftersmak typ än bra nästan'.split(' '));
 
 // Fun facts computed from the whole archive: imported history plus revealed tastings.
@@ -82,7 +90,7 @@ export default function Stats({archive}:{archive:any}){
 
    <section className="stat-card wide"><h2><Coins size={20}/>Är dyrare godare?</h2>
     {!overall?<p className="big-claim">För lite prisdata ännu.</p>:<>
-    <p className="big-claim">{overall.p<0.05?(overall.slope>0?'Ja, lite grann.':'Tvärtom!'):'Inte så att det går att säga säkert.'} Två sätt att jämföra, båda med priset satt i relation till liknande drycker.</p>
+    <p className="big-claim">{verdict(overall,global)} Två sätt att jämföra, båda med priset satt i relation till liknande drycker.</p>
     {global&&<><h3 className="effect-title">Alla provningar, pris standardiserat inom dryckestyp</h3>
     <p>En flaska som är <b>en standardavvikelse dyrare än normalt för sin typ</b> får i snitt <b>{global.slope>=0?'+':''}{fmt(global.slope,2)} poäng</b> jämfört med typens snitt. {global.p<0.05?'Sambandet håller över alla kvällar.':'Över alla kvällar är sambandet för osäkert för en säker slutsats.'}</p>
     <div className="effect-facts">
