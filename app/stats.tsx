@@ -82,17 +82,24 @@ export default function Stats({archive}:{archive:any}){
 
    <section className="stat-card wide"><h2><Coins size={20}/>Är dyrare godare?</h2>
     {!overall?<p className="big-claim">För lite prisdata ännu.</p>:<>
-    <p className="big-claim">{overall.p<0.05?(overall.slope>0?'Ja, lite grann.':'Tvärtom!'):'Inte så att det går att säga säkert.'} När ni jämför drycker i samma provning ger en dubbelt så dyr flaska i snitt <b>{overall.slope>=0?'+':''}{fmt(overall.slope,2)} poäng</b>.</p>
+    <p className="big-claim">{overall.p<0.05?(overall.slope>0?'Ja, lite grann.':'Tvärtom!'):'Inte så att det går att säga säkert.'} Två sätt att jämföra, båda med priset satt i relation till liknande drycker.</p>
+    {global&&<><h3 className="effect-title">Alla provningar, pris standardiserat inom dryckestyp</h3>
+    <p>En flaska som är <b>en standardavvikelse dyrare än normalt för sin typ</b> får i snitt <b>{global.slope>=0?'+':''}{fmt(global.slope,2)} poäng</b> jämfört med typens snitt. {global.p<0.05?'Sambandet håller över alla kvällar.':'Över alla kvällar är sambandet för osäkert för en säker slutsats.'}</p>
+    <div className="effect-facts">
+     <div><b>{fmt(global.low,2)} till {fmt(global.high,2)}</b><span>95 % konfidensintervall</span></div>
+     <div><b>p = {pf(global.p)}</b><span>klustrade standardfel per provning</span></div>
+     <div><b>r = {fmt(global.r,2)}</b><span>partiell korrelation</span></div>
+     <div><b>{global.n} drycker</b><span>i {global.types} typer, {global.clusters} provningar</span></div>
+    </div>
+    <p className="muted fine">Typerna är kategorierna, men öl och vin delas upp per stil (lager, IPA, rött, vitt och så vidare). En dyr lager och en dyr cognac hamnar därmed på samma skala.</p></>}
+    <h3 className="effect-title">Inom samma provning</h3>
+    <p>En flaska som kostar dubbelt så mycket som en annan samma kväll får i snitt <b>{overall.slope>=0?'+':''}{fmt(overall.slope,2)} poäng</b> mer. Samma jury och samma kväll, så det är det strängaste testet.</p>
     <div className="effect-facts">
      <div><b>{fmt(overall.low,2)} till {fmt(overall.high,2)}</b><span>95 % konfidensintervall</span></div>
      <div><b>p = {pf(overall.p)}</b><span>t-test{overall.permP!=null?`, permutation p = ${pf(overall.permP)}`:''}</span></div>
      <div><b>r = {fmt(overall.r,2)}</b><span>partiell korrelation</span></div>
      <div><b>{overall.n} drycker</b><span>i {overall.groups} provningar</span></div>
     </div>
-    {global&&<div className="global-effect"><h3 className="effect-title">Globalt, inom dryckestyp</h3>
-     <p>Över alla {global.clusters} provningar: en flaska som är <b>en standardavvikelse dyrare än normalt för sin typ</b> får i snitt <b>{global.slope>=0?'+':''}{fmt(global.slope,2)} poäng</b> (95 % KI {fmt(global.low,2)} till {fmt(global.high,2)}, p = {pf(global.p)}). {global.p<0.05?'Det håller även över alla kvällar.':'Över alla kvällar är sambandet för osäkert för en säker slutsats.'}</p>
-     <p className="muted fine">{global.n} drycker i {global.types} typer, klustrade standardfel per provning. Lager och IPA, rött och vitt vin och så vidare räknas som egna typer.</p>
-    </div>}
     {catEffects.length>0&&<><h3 className="effect-title">Per kategori</h3><p className="muted fine">Poäng per dubblat pris med 95 % konfidensintervall. Strecket i mitten är noll, alltså inget samband.</p>
     <div className="forest" role="table" aria-label="Effekt av dubblat pris per kategori">{catEffects.map((x,i)=><div className="forest-row" role="row" key={x.c} title={`${x.c}: ${fmt(x.e.slope,2)} poäng per dubblat pris (95 % KI ${fmt(x.e.low,2)} till ${fmt(x.e.high,2)}), p = ${pf(x.e.p)}, Holm-justerat p = ${pf(holmP[i])}, ${x.e.n} drycker`}>
      <span role="cell" className="forest-label">{x.c}<small>{x.e.n} drycker</small></span>
