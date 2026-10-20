@@ -148,6 +148,22 @@ assert.equal(env.sqlite.prepare('SELECT owner FROM tastings WHERE id=?').get(rom
 assert.ok((await call(history,'guest','/api/history')).sessions.some(x=>x.id===rom.id));
 assert.equal((await call(imp,'boss','/api/import',full)).full.tastings,0);
 await call(members,'boss','/api/members',{action:'test-reset'});
+// An admin can open (and so remove) a revealed tasting hosted by someone else; others cannot.
+let gk=await call(club,'guest','/api/club',{action:'create',title:'Gästens kväll'});
+gk=await call(club,'guest','/api/club',{action:'save',id:gk.id,version:gk.version,title:'Gästens kväll',plan:{theme:'',notes:'',budget:null,expected:[],participants:['guest'],samples:[{id:'q1',name:'Q',number:1,type:'Rom'}]}});
+gk=await call(club,'guest','/api/club',{action:'start',id:gk.id});
+await call(club,'guest','/api/club',{action:'vote',id:gk.id,sample:'q1',vote:{score:6}});
+await call(club,'boss','/api/club?id='+gk.id,undefined,400);
+await call(club,'guest','/api/club',{action:'reveal',id:gk.id});
+assert.equal((await call(club,'boss','/api/club?id='+gk.id)).status,'revealed');
+await call(club,'stranger','/api/club?id='+gk.id,undefined,400);
+// Restore uses one statement per chunk, not per row (D1 allows 50 queries per request on the free plan).
+const many={format:2,tables:{ratings:Array.from({length:600},(_,i)=>({session:'bulk',user:'u'+i,sample:'s',data:'{"score":5}'}))}};
+let statements=0;const batch=env.DB.batch;env.DB.batch=async a=>{statements+=a.length;return batch(a);};
+assert.equal((await call(imp,'boss','/api/import',many)).full.ratings,600);env.DB.batch=batch;
+assert.ok(statements<=2,'statements '+statements);
+env.sqlite.prepare("DELETE FROM ratings WHERE session='bulk'").run();
+
 
 // Clerk mode: identity headers are ignored; only a valid session token for this origin counts.
 const {privateKey,publicKey}=generateKeyPairSync('rsa',{modulusLength:2048});

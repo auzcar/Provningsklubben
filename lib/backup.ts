@@ -12,10 +12,11 @@ export const BACKUP_TABLES={
 } as const;
 export type Backup={format:2;created:string;tables:Record<string,Record<string,unknown>[]>};
 
+// One D1 batch runs as a single transaction, so all tables come from the same moment.
 export async function snapshot(db:D1Database):Promise<Backup>{
- const tables:Backup['tables']={};
- for(const [t,cols] of Object.entries(BACKUP_TABLES))tables[t]=(await db.prepare(`SELECT ${cols.join(',')} FROM ${t}`).all()).results as any[];
- return {format:2,created:new Date().toISOString(),tables};
+ const names=Object.keys(BACKUP_TABLES) as (keyof typeof BACKUP_TABLES)[];
+ const res=await db.batch(names.map(t=>db.prepare(`SELECT ${BACKUP_TABLES[t].join(',')} FROM ${t}`)));
+ return {format:2,created:new Date().toISOString(),tables:Object.fromEntries(names.map((t,i)=>[t,res[i].results as any[]]))};
 }
 
 // Weekly copies are kept for twelve weeks; D1 Time Travel covers the last days minute by minute.

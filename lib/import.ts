@@ -14,14 +14,18 @@ export function parseBackup(input:any){
  }
  throw Error('Okänt filformat. Välj en säkerhetskopia från appen, recovery-data.json eller history.json.');
 }
-// Format 2 restores every table as it was, including owners and profiles.
+// Format 2 restores every table as it was, including owners and profiles. D1 caps the
+// number of queries per request (50 on the free plan), so rows go in as JSON chunks of
+// about 500 kB, one statement per chunk, instead of one statement per row.
+const CHUNK=500_000;
 async function importFull(db:D1Database,input:any){
  const out:Record<string,number>={};
  for(const [t,cols] of Object.entries(BACKUP_TABLES)){
   const rows=input.tables[t];if(rows!=null&&!Array.isArray(rows))throw Error('Filen är skadad.');
-  if(!rows?.length){out[t]=0;continue;}
-  const stmts=rows.map((r:any)=>db.prepare(`INSERT OR IGNORE INTO ${t}(${cols.join(',')}) VALUES(${cols.map(()=>'?').join(',')})`).bind(...cols.map(c=>r[c]??null)));
-  out[t]=(await db.batch(stmts)).reduce((n,r:any)=>n+(r.meta?.changes||0),0);
+  const chunks:string[][]=[];let size=0;
+  for(const r of rows||[]){const v=JSON.stringify(cols.map(c=>r?.[c]??null));if(!chunks.length||size+v.length>CHUNK){chunks.push([]);size=0;}chunks[chunks.length-1].push(v);size+=v.length+1;}
+  const sql=`INSERT OR IGNORE INTO ${t}(${cols.join(',')}) SELECT ${cols.map((_,k)=>`json_extract(value,'$[${k}]')`).join(',')} FROM json_each(?)`;
+  out[t]=chunks.length?(await db.batch(chunks.map(c=>db.prepare(sql).bind('['+c.join(',')+']')))).reduce((n,r:any)=>n+(r.meta?.changes||0),0):0;
  }
  return out;
 }
