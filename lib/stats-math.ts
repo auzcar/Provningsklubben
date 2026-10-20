@@ -69,38 +69,43 @@ export function holm(ps:number[]){
  order.forEach(([p,i],k)=>{run=Math.max(run,Math.min(1,(ps.length-k)*p));adj[i]=run;});return adj as number[];
 }
 
-// Global comparison across all tastings: price is standardised within each drink type
-// (z-score of log2 litre price), the score is compared with the type's average, and the
-// standard error is cluster-robust by tasting (CR1, t with clusters−1 df), because drinks
-// from the same evening share a jury and a mood and are not independent.
-const median=(a:number[])=>{const v=[...a].sort((x,y)=>x-y),m=v.length>>1;return v.length%2?v[m]:(v[m-1]+v[m])/2;};
+// Per drink type: how much the score changes per price step in kronor. The step follows the
+// type's price level (about a fifth of the median, rounded to 5, 10, 20, 50, 100 or 200 kr),
+// so beer moves in 5 kr steps and spirits in 100 kr steps. Prices are rescaled to the type's
+// usual bottle size. Types from three or more tastings get cluster-robust (CR1) standard errors
+// by tasting, since drinks from the same evening share a jury; otherwise ordinary OLS ones.
 export type TypedDrink={session:string;type:string;price:number;volume?:number|null;avg:number};
-export type GlobalEffect={n:number;types:number;clusters:number;df:number;slope:number;se:number;low:number;high:number;p:number;r:number;clustered:boolean;scales:TypeScale[]};
-/** Per type: the SD of log2 litre price and the median bottle price, to turn "one SD" into kronor. */
-export type TypeScale={type:string;sd:number;median:number};
-// With fewer than three tastings clustering is impossible; allowUnclustered then falls back to
-// ordinary OLS standard errors (t with n−types−1 df), which ignores the shared-evening dependence.
-export function globalPriceEffect(drinks:TypedDrink[],minPerType=5,allowUnclustered=false):GlobalEffect|null{
+export type StepEffect={type:string;n:number;clusters:number;clustered:boolean;df:number;step:number;median:number;min:number;max:number;slope:number;se:number;low:number;high:number;p:number};
+const median=(a:number[])=>{const v=[...a].sort((x,y)=>x-y),m=v.length>>1;return v.length%2?v[m]:(v[m-1]+v[m])/2;};
+const STEPS=[5,10,20,50,100,200];
+export function stepEffects(drinks:TypedDrink[],minPerType=5):StepEffect[]{
  const byType=new Map<string,TypedDrink[]>();for(const d of drinks){if(!(d.price>0)||!Number.isFinite(d.avg))continue;const g=byType.get(d.type)||[];g.push(d);byType.set(d.type,g);}
- const z:number[]=[],y:number[]=[],cl:string[]=[],scales:TypeScale[]=[];let types=0;
- for(const g of byType.values()){
+ const out:StepEffect[]=[];
+ for(const [type,g] of byType){
   if(g.length<minPerType)continue;
-  // A missing volume gets the type's median volume; bottle sizes are fairly standard within a type.
-  const vols=g.map(d=>d.volume||0).filter(v=>v>0);const med=vols.length?median(vols):0;
-  const xs=g.map(d=>{const v=(d.volume||0)>0?d.volume!:med;return Math.log2(v>0?d.price/(v/100):d.price);});
-  const mx=xs.reduce((a,b)=>a+b,0)/xs.length,sd=Math.sqrt(xs.reduce((a,v)=>a+(v-mx)**2,0)/(xs.length-1));if(!(sd>0))continue;
-  const my=g.reduce((a,d)=>a+d.avg,0)/g.length;
-  g.forEach((d,i)=>{z.push((xs[i]-mx)/sd);y.push(d.avg-my);cl.push(d.session);});types++;
-  scales.push({type:g[0].type,sd,median:median(g.map(d=>d.price))});
+  const vols=g.map(d=>d.volume||0).filter(v=>v>0),usual=vols.length?median(vols):0;
+  const price=g.map(d=>{const v=(d.volume||0)>0?d.volume!:usual;return usual>0?d.price/v*usual:d.price;});
+  const med=median(price),step=STEPS.reduce((a,b)=>Math.abs(Math.log(b/(med/5)))<Math.abs(Math.log(a/(med/5)))?b:a);
+  const x=price.map(v=>v/step),mx=x.reduce((a,b)=>a+b,0)/x.length,my=g.reduce((a,d)=>a+d.avg,0)/g.length;
+  const xc=x.map(v=>v-mx),yc=g.map(d=>d.avg-my),sxx=xc.reduce((a,v)=>a+v*v,0);if(!(sxx>0))continue;
+  const slope=xc.reduce((a,v,i)=>a+v*yc[i],0)/sxx,res=yc.map((v,i)=>v-slope*xc[i]),n=g.length,clusters=new Set(g.map(d=>d.session)).size,clustered=clusters>=3;
+  let se:number,df:number;
+  if(clustered){const sc=new Map<string,number>();g.forEach((d,i)=>sc.set(d.session,(sc.get(d.session)||0)+xc[i]*res[i]));let meat=0;for(const v of sc.values())meat+=v*v;se=Math.sqrt(meat/(sxx*sxx)*(clusters/(clusters-1))*((n-1)/(n-2)));df=clusters-1;}
+  else{df=n-2;se=Math.sqrt(res.reduce((a,v)=>a+v*v,0)/df/sxx);}
+  if(!(se>0))continue;const crit=tCritical(df);
+  out.push({type,n,clusters,clustered,df,step,median:med,min:Math.min(...price),max:Math.max(...price),slope,se,low:slope-crit*se,high:slope+crit*se,p:tPValue(slope/se,df)});
  }
- const n=z.length,clusters=new Set(cl).size,k=types+1,clustered=clusters>=3;if(!clustered&&!allowUnclustered||n<=k)return null;
- const szz=z.reduce((a,v)=>a+v*v,0),syy=y.reduce((a,v)=>a+v*v,0),szy=z.reduce((a,v,i)=>a+v*y[i],0);if(szz===0||syy===0)return null;
- const slope=szy/szz;let se:number,df:number;
- if(clustered){
-  const score=new Map<string,number>();z.forEach((v,i)=>score.set(cl[i],(score.get(cl[i])||0)+v*(y[i]-slope*v)));
-  let meat=0;for(const s of score.values())meat+=s*s;
-  se=Math.sqrt(meat/(szz*szz)*(clusters/(clusters-1))*((n-1)/(n-k)));df=clusters-1;
- }else{df=n-k;se=Math.sqrt(y.reduce((a,v,i)=>a+(v-slope*z[i])**2,0)/df/szz);}
- const crit=tCritical(df);
- return {n,types,clusters,df,slope,se,low:slope-crit*se,high:slope+crit*se,p:tPValue(slope/se,df),r:szy/Math.sqrt(szz*syy),clustered,scales};
+ return out;
+}
+
+// Standard normal tail via erfc (Numerical Recipes, |error| < 1.2e-7).
+function erfc(x:number){const z=Math.abs(x),t=1/(1+z/2),r=t*Math.exp(-z*z-1.26551223+t*(1.00002368+t*(.37409196+t*(.09678418+t*(-.18628806+t*(.27886807+t*(-1.13520398+t*(1.48851587+t*(-.82215223+t*.17087277)))))))));return x>=0?r:2-r;}
+export type Pooled={k:number;mean:number;se:number;low:number;high:number;p:number;tau2:number;i2:number};
+/** DerSimonian–Laird random-effects mean of per-type effects, with a normal 95 % CI. */
+export function pool(effects:{slope:number;se:number}[]):Pooled|null{
+ const k=effects.length;if(k<2)return null;
+ const w=effects.map(e=>1/e.se**2),sw=w.reduce((a,b)=>a+b,0),fe=effects.reduce((a,e,i)=>a+w[i]*e.slope,0)/sw;
+ const q=effects.reduce((a,e,i)=>a+w[i]*(e.slope-fe)**2,0),c=sw-w.reduce((a,v)=>a+v*v,0)/sw,tau2=Math.max(0,(q-(k-1))/c);
+ const ws=effects.map(e=>1/(e.se**2+tau2)),sws=ws.reduce((a,b)=>a+b,0),mean=effects.reduce((a,e,i)=>a+ws[i]*e.slope,0)/sws,se=Math.sqrt(1/sws);
+ return {k,mean,se,low:mean-1.959963984540054*se,high:mean+1.959963984540054*se,p:erfc(Math.abs(mean/se)/Math.SQRT2),tau2,i2:q>0?Math.max(0,(q-(k-1))/q):0};
 }

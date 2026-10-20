@@ -4,34 +4,33 @@ import {Trophy,Frown,Flame,PiggyBank,Users,Heart,Gavel,Sparkles,Star,Coins,Messa
 import {api} from '@/lib/client-api';
 import {categoryOrder} from '@/lib/drink-categories';
 import SbLink from './sb-link';
-import {holm,globalPriceEffect,type TypedDrink,type GlobalEffect} from '@/lib/stats-math';
+import {holm,stepEffects,pool,type TypedDrink} from '@/lib/stats-math';
 
 const fmt=(n:any,d=1)=>n==null||!Number.isFinite(n)?'–':Number(n).toLocaleString('sv-SE',{minimumFractionDigits:d,maximumFractionDigits:d});
 const kr=(n:number)=>Math.round(n).toLocaleString('sv-SE')+' kr';
 const mean=(a:number[])=>a.length?a.reduce((x,y)=>x+y,0)/a.length:null;
-const pct=(f:number)=>Math.round((f-1)*100)+' %';
 const pf=(p:number)=>p<0.001?'< 0,001':fmt(p,3);
-type Effect={slope:number;low:number;high:number;p:number;n:number};
-type ForestRow={c:string;sub:string;e:Effect;adj?:number};
-// Forest plot: the pooled estimate as a diamond spanning its 95 % CI, then one line per group.
+const signed=(v:number)=>(v>=0?'+':'')+fmt(v,2);
+type ForestRow={c:string;sub:string;unit:string;slope:number;low:number;high:number;p:number;n:number;title:string};
+// Forest plot: the pooled estimate as a diamond spanning its 95 % CI, then one line per type.
 // Intervals wider than the axis end in an arrow.
-function Forest({unit,label,total,rows}:{unit:string;label:string;total:ForestRow;rows:ForestRow[]}){
- const all=[total,...rows];const raw=Math.max(...all.flatMap(r=>[Math.abs(r.e.low),Math.abs(r.e.high)]));
- const span=Math.min(4,[0.5,1,1.5,2,3,4].find(v=>v>=raw)??4);
+function Forest({label,total,rows}:{label:string;total:ForestRow;rows:ForestRow[]}){
+ const raw=Math.max(...[total,...rows].flatMap(r=>[Math.abs(r.low),Math.abs(r.high)]));
+ const span=Math.min(3,[0.5,1,1.5,2,3].find(v=>v>=raw)??3);
  const at=(v:number)=>Math.max(0,Math.min(100,50+v/span*50));
- const line=(r:ForestRow,isTotal:boolean)=>{const sig=(r.adj??r.e.p)<0.05;return <div className={'forest-row'+(isTotal?' total':'')} role="row" key={r.c} title={`${r.c}: ${fmt(r.e.slope,2)} ${unit} (95 % KI ${fmt(r.e.low,2)} till ${fmt(r.e.high,2)}), p = ${pf(r.e.p)}${r.adj!=null?`, Holm-justerat p = ${pf(r.adj)}`:''}, ${r.e.n} drycker`}>
+ const line=(r:ForestRow,isTotal:boolean)=><div className={'forest-row'+(isTotal?' total':'')} role="row" key={r.c} title={r.title}>
   <span role="cell" className="forest-label">{r.c}<small>{r.sub}</small></span>
   <span role="cell" className="forest-track"><span className="forest-tick" style={{left:'25%'}}/><span className="forest-tick" style={{left:'75%'}}/><span className="forest-zero"/>
-   {isTotal?<span className={'forest-diamond'+(sig?' sig':'')} style={{left:at(r.e.low)+'%',width:at(r.e.high)-at(r.e.low)+'%'}}/>:<>
-   <span className={'forest-ci'+(r.e.low<-span?' cut-left':'')+(r.e.high>span?' cut-right':'')} style={{left:at(r.e.low)+'%',width:at(r.e.high)-at(r.e.low)+'%'}}/>
-   <span className={'forest-dot'+(sig?' sig':'')} style={{left:at(r.e.slope)+'%',width:6+Math.sqrt(r.e.n)*1.6,height:6+Math.sqrt(r.e.n)*1.6}}/></>}
+   {isTotal?<span className={'forest-diamond'+(r.p<0.05?' sig':'')} style={{left:at(r.low)+'%',width:at(r.high)-at(r.low)+'%'}}/>:<>
+   <span className={'forest-ci'+(r.low<-span?' cut-left':'')+(r.high>span?' cut-right':'')} style={{left:at(r.low)+'%',width:at(r.high)-at(r.low)+'%'}}/>
+   <span className={'forest-dot'+(r.p<0.05?' sig':'')} style={{left:at(r.slope)+'%',width:6+Math.sqrt(r.n)*1.6,height:6+Math.sqrt(r.n)*1.6}}/></>}
   </span>
-  <span role="cell" className="forest-num">{r.e.slope>=0?'+':''}{fmt(r.e.slope,2)}<small>{r.adj!=null?'justerat ':''}p = {pf(r.adj??r.e.p)}</small></span>
- </div>;};
- return <figure className="forest-figure"><figcaption className="muted fine">{unit[0].toUpperCase()+unit.slice(1)}, med 95 % konfidensintervall. Strecket i mitten är noll, alltså inget samband. Ifylld markör betyder p &lt; 0,05{rows.some(r=>r.adj!=null)?' (per grupp efter Holm-justering)':''}, och större prick betyder fler drycker.</figcaption>
+  <span role="cell" className="forest-num">{signed(r.slope)}<small>{r.unit}</small></span>
+ </div>;
+ return <figure className="forest-figure">
   <div className="forest" role="table" aria-label={label}>{line(total,true)}{rows.map(r=>line(r,false))}</div>
   <div className="forest-axis"><span>−{fmt(span,1)}</span><span>0</span><span>+{fmt(span,1)}</span></div>
-  <div className="forest-hint"><span>← lägre betyg</span><span>högre betyg →</span></div>
+  <div className="forest-hint"><span>← sämre betyg</span><span>bättre betyg →</span></div>
  </figure>;
 }
 const STOP=new Set('och att det som en är på för med av till den har inte men lite mer mycket så från var om kan ett jag du vi de ingen sig smakar smak luktar eftersmak typ än bra nästan'.split(' '));
@@ -54,18 +53,13 @@ export default function Stats({archive}:{archive:any}){
  const top=[...rated].sort((a,b)=>b.avg-a.avg).slice(0,5);const bottom=[...rated].sort((a,b)=>a.avg-b.avg).slice(0,3);
  const contested=[...rated].sort((a,b)=>b.spread-a.spread).slice(0,3);
  const bargains=priced.filter((d:any)=>d.price>=50&&d.avg!=null&&d.scores.length>=2).map((d:any)=>({...d,value:d.avg/d.price*100})).sort((a:any,b:any)=>b.value-a.value).slice(0,3);
- // Is expensive better? Compared within each tasting, see lib/stats-math.ts.
- // Global comparison: price standardised within each type (beer and wine split by style).
+ // Is expensive better? Per drink type in kronor steps that fit the type, see lib/stats-math.ts.
  const typeOf=(d:any)=>(d.category==='Öl'||d.category==='Vin')&&d.subcategory?d.subcategory:d.category;
  const typedRows:TypedDrink[]=drinks.filter((d:any)=>d.avg!=null).map((d:any)=>({session:d.sessionId,type:typeOf(d),price:d.price,volume:d.volume,avg:d.avg}));
- const global=globalPriceEffect(typedRows);
- // Per type the same model on one type at a time; types from one or two tastings get ordinary standard errors.
- const typeEffects=[...new Set(typedRows.map(r=>r.type))].map(t=>({c:t,e:globalPriceEffect(typedRows.filter(r=>r.type===t),5,true)})).filter(x=>x.e).sort((a,b)=>b.e!.n-a.e!.n) as {c:string;e:GlobalEffect}[];
- const typeHolm=holm(typeEffects.map(x=>x.e.p));
- // In kronor: one SD step as a price factor, typical across types, with the most tasted type as example.
- const sds=(global?.scales||[]).map(t=>t.sd).sort((a,b)=>a-b);const typical=sds.length?2**sds[sds.length>>1]:1;
- const example=(['Whisky','Rom','Gin','Cognac'].map(t=>typeEffects.find(x=>x.c===t)).find(Boolean)||typeEffects[0])?.e.scales[0];
- const fewTypes=[...new Set(typedRows.map(r=>r.type))].filter(t=>!typeEffects.some(x=>x.c===t)).sort((a,b)=>a.localeCompare(b,'sv'));
+ const steps=stepEffects(typedRows).sort((a,b)=>b.slope-a.slope);
+ const stepHolm=holm(steps.map(e=>e.p));const pooled=pool(steps);
+ const best=steps[0],worst=steps[steps.length-1];
+ const fewTypes=[...new Set(typedRows.filter(r=>r.price>0).map(r=>r.type))].filter(t=>!steps.some(e=>e.type===t)).sort((a,b)=>a.localeCompare(b,'sv'));
  const names=[...new Set<string>(drinks.flatMap((d:any)=>d.ratings.map((v:any)=>v.name)))];
  const people=names.map(n=>{
   const mine:{score:number;cat:string;sessionId:string}[]=drinks.flatMap((d:any)=>d.ratings.filter((v:any)=>v.name===n&&v.score!=null&&!v.skip).map((v:any)=>({score:v.score,cat:d.category,sessionId:d.sessionId})));
@@ -107,20 +101,19 @@ export default function Stats({archive}:{archive:any}){
    <section className="stat-card"><h2><PiggyBank size={20}/>Fynden</h2><p className="muted">Flest poäng per hundralapp, flaskor från 50 kr.</p><ol className="fact-list">{bargains.map((d:any)=><li key={d.id}><span><b>{d.name} <SbLink drink={d}/></b><small>{kr(d.price)} · snitt {fmt(d.avg)}</small></span><em>{fmt(d.value,2)}<small> p/100 kr</small></em></li>)}</ol></section>
 
    <section className="stat-card wide"><h2><Coins size={20}/>Är dyrare godare?</h2>
-    {!global?<p className="big-claim">För lite prisdata ännu.</p>:<>
-    <p className="big-claim">{global.p<0.05?(global.slope>0?'Ja, lite grann.':'Tvärtom!'):'Inte så att det går att säga säkert.'} En flaska som kostar <b>{pct(typical)} mer än vad som är normalt för sin typ</b> får i snitt <b>{global.slope>=0?'+':''}{fmt(global.slope,2)} poäng</b> jämfört med typens snitt{example&&<>, till exempel en {example.type.toLocaleLowerCase('sv')} för {kr(example.median*2**example.sd)} i stället för {kr(example.median)}</>}.</p>
-    <div className="effect-facts">
-     <div><b>{fmt(global.low,2)} till {fmt(global.high,2)}</b><span>95 % konfidensintervall</span></div>
-     <div><b>p = {pf(global.p)}</b><span>klustrade standardfel per provning</span></div>
-     <div><b>r = {fmt(global.r,2)}</b><span>partiell korrelation</span></div>
-     <div><b>{global.n} drycker</b><span>i {global.types} typer, {global.clusters} provningar</span></div>
-    </div>
-    <Forest unit="poäng per standardavvikelse i pris inom typen" label="Effekt av pris inom dryckestyp" total={{c:'Alla typer',sub:`${global.types} typer · ${pct(typical)} dyrare`,e:global}} rows={typeEffects.map((x,i)=>({c:x.c,sub:`${x.e.n} drycker · ${kr(x.e.scales[0].median)} → ${kr(x.e.scales[0].median*2**x.e.scales[0].sd)}`,e:x.e,adj:typeHolm[i]}))}/>
-    <p className="muted fine">Under varje typ står vad en standardavvikelse betyder i kronor: från typens medianpris till en flaska som är en standardavvikelse dyrare. Prisskillnaden mellan billigt och dyrt är olika stor i olika typer, därför jämförs varje typ på sin egen skala. {fewTypes.length>0&&`För få prissatta drycker (under fem) för att räknas: ${fewTypes.join(', ')}.`}</p>
+    {!pooled?<p className="big-claim">För lite prisdata ännu.</p>:<>
+    <p className="big-claim">{pooled.p<0.05?(pooled.mean>0?'Ja, lite grann.':'Tvärtom!'):'Inte så att det går att säga säkert.'} Lägger man ungefär en femtedel mer på flaskan blir betyget i snitt <b>{signed(pooled.mean)} poäng</b>.</p>
+    {best.slope>0&&worst.slope<0&&<div className="price-duel">
+     <div><span className="eyebrow">VÄRT PENGARNA</span><b>{best.type}</b><span>{signed(best.slope)} poäng per +{best.step} kr</span></div>
+     <div><span className="eyebrow">SPARA SLANTARNA</span><b>{worst.type}</b><span>{signed(worst.slope)} poäng per +{worst.step} kr</span></div>
+    </div>}
+    <Forest label="Betyg per prissteg och dryckestyp" total={{c:'Alla typer',sub:`${pooled.k} typer`,unit:'per femtedel',slope:pooled.mean,low:pooled.low,high:pooled.high,p:pooled.p,n:0,title:`Vägt snitt av ${pooled.k} typer: ${signed(pooled.mean)} poäng per prissteg (95 % KI ${fmt(pooled.low,2)} till ${fmt(pooled.high,2)}), p = ${pf(pooled.p)}`}}
+     rows={steps.map((e,i)=>({c:e.type,sub:`${Math.round(e.min).toLocaleString('sv-SE')}–${kr(e.max)}`,unit:`per +${e.step} kr`,slope:e.slope,low:e.low,high:e.high,p:e.p,n:e.n,title:`${e.type}: ${signed(e.slope)} poäng per +${e.step} kr (95 % KI ${fmt(e.low,2)} till ${fmt(e.high,2)}), p = ${pf(e.p)}, Holm-justerat p = ${pf(stepHolm[i])}, ${e.n} drycker från ${e.clusters} ${e.clusters===1?'provning':'provningar'}`}))}/>
+    <p className="muted fine">Varje typ mäts i egna prissteg, ungefär en femtedel av typens vanliga pris: 5 kr för öl, 20 kr för vin, 100 kr för sprit. Strecken är 95 % konfidensintervall och ifylld prick betyder p &lt; 0,05. Med {steps.length} typer kan någon enstaka träff vara slump. {fewTypes.length>0&&`För få prissatta drycker för att räknas: ${fewTypes.join(', ')}.`}</p>
     <details className="method"><summary>Hur räknar vi?</summary>
-     <p>Priserna skiljer sig enormt mellan dryckestyper, så en cognac kan inte jämföras med en öl i kronor. Därför standardiseras priset inom varje dryckestyp: whisky mot whisky, cognac mot cognac, lager mot lager. Typerna är kategorierna, men öl och vin delas upp per stil (lager, IPA, rött, vitt och så vidare). En dyr lager och en dyr cognac hamnar därmed på samma skala.</p>
-     <p>Priset räknas per liter (saknad volym ersätts med typens medianvolym) och på en logaritmisk skala, och görs om till ett z-värde inom typen: hur många standardavvikelser dyrare eller billigare än typens snitt flaskan är. Betyget jämförs med typens snitt, och betyget regresseras på z-värdet.</p>
-     <p>Drycker från samma kväll delar jury och humör och är inte oberoende, därför används klusterrobusta standardfel per provning (t-fördelning med antal provningar minus ett frihetsgrader). Typer med färre än fem prissatta drycker räknas inte. En typ som bara provats under en eller två kvällar kan inte klustras och får i diagrammet vanliga standardfel. Typernas p-värden är Holm-justerade för att flera test görs samtidigt; ifylld markör betyder p &lt; 0,05.</p>
+     <p>Varje dryckestyp räknas för sig, eftersom en cognac inte kan jämföras med en öl i kronor. Typerna är kategorierna, men öl och vin delas upp per stil (lager, IPA, rött, vitt och så vidare). Priset räknas om till typens vanliga flaskstorlek, och prissteget är typens medianpris delat med fem, avrundat till 5, 10, 20, 50, 100 eller 200 kr. Snittbetyget regresseras sedan linjärt på priset inom typen.</p>
+     <p>Drycker från samma kväll delar jury och humör och är inte oberoende. För typer som provats under minst tre kvällar används därför klusterrobusta standardfel per provning (t-fördelning med antal provningar minus ett frihetsgrader), annars vanliga standardfel. Typer med färre än fem prissatta drycker räknas inte.</p>
+     <p>"Alla typer" är ett vägt snitt av typernas skattningar (random effects, DerSimonian–Laird), där säkra skattningar väger tyngre. Eftersom stegen är ungefär en femtedel av typens pris kan de vägas ihop. Holm-justerade p-värden, som tar hänsyn till att {steps.length} typer testas samtidigt, visas när man pekar på en rad.</p>
     </details></>}
    </section>
 
