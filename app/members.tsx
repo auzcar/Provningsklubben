@@ -4,6 +4,7 @@ import {Mail,LoaderCircle,X,ShieldCheck,UserX,UserCheck,Link2,ChevronRight,Uploa
 import {api} from '@/lib/client-api';
 import {Avatar} from './profile';
 import type {Me} from './auth-gate';
+import {TestModePanel} from './test-mode';
 
 export default function Members({me,openProfile}:{me:Me;openProfile:(id:string)=>void}){
  const [data,setData]=useState<any>(null);const [error,setError]=useState('');const [notice,setNotice]=useState('');const [email,setEmail]=useState('');const [busy,setBusy]=useState(false);const [linking,setLinking]=useState<any>(null);
@@ -28,6 +29,7 @@ export default function Members({me,openProfile}:{me:Me;openProfile:(id:string)=
     {m.id!==me.id&&<button className="text-button danger" disabled={busy} onClick={()=>confirm(`Inaktivera ${m.name}? Personen kan inte längre logga in i klubben.`)&&run({action:'update',user:m.id,status:'removed'},m.name+' är inaktiverad.')}><UserX size={14}/>Inaktivera</button>}
    </div>}
   </article>)}</div>
+  {me.admin&&<TestModePanel/>}
   {me.admin&&<section className="panel"><div className="eyebrow">ADMINISTRATION</div><h2>Importera historik</h2><p className="muted fine">Välj <b>recovery-data.json</b> eller <b>history.json</b> från den privata säkerhetskopian. Filen skickas direkt till klubbens databas. Befintliga provningar skrivs aldrig över, så importen kan köras igen utan risk.</p><label className="secondary file-button"><Upload size={16}/>{busy?'Importerar…':'Välj fil'}<input type="file" accept=".json,application/json" hidden disabled={busy} onChange={async e=>{const f=e.target.files?.[0];e.target.value='';if(!f)return;setBusy(true);setError('');setNotice('');try{let json:any;try{json=JSON.parse(await f.text());}catch{throw Error('Filen är inte giltig JSON.');}const d=await api('/api/import',json);setNotice(`Klart: ${d.historical} nya provningar i arkivet (filen innehöll ${d.total.historical} provningar, ${d.total.samples} drycker och ${d.total.ratings} betyg)${d.tastings?`, ${d.tastings} pågående provning med dig som värd`:''}. Koppla nu arkivnamnen till medlemmarna.`);setData(await api('/api/members'));}catch(err:any){setError(err.message);}finally{setBusy(false);}}}/></label></section>}
   {me.admin&&removed.length>0&&<section className="profile-section"><h3>Inaktiverade</h3>{removed.map((m:any)=><div className="row between invite" key={m.id}><span>{m.name} {m.email&&<small className="muted">{m.email}</small>}</span><button className="text-button" disabled={busy} onClick={()=>run({action:'update',user:m.id,status:'active'},m.name+' är aktiv igen.')}><UserCheck size={14}/>Återaktivera</button></div>)}</section>}
   {linking&&<div className="modal-backdrop" onClick={()=>setLinking(null)}><div className="modal" role="dialog" aria-modal="true" aria-label="Koppla arkivnamn" onClick={e=>e.stopPropagation()}><button className="close" aria-label="Stäng" onClick={()=>setLinking(null)}><X/></button><div className="eyebrow">ARKIVET</div><h2>{linking.name}</h2><p>Välj de namn medlemmen har i den importerade historiken. Deras gamla betyg visas då på profilen.</p>

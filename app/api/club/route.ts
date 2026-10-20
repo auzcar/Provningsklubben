@@ -1,6 +1,7 @@
 import {env} from 'cloudflare:workers';
 import {validatePlan,validateVote,visibleSamples,costShare} from '@/lib/model';
 import {requireMember,reply,fail,sameOrigin} from '@/lib/auth';
+import {isTestUser} from '@/lib/test-users';
 export const dynamic='force-dynamic';
 const uid=async(r:Request)=>(await requireMember(r,env)).id;
 const db=()=>{if(!env.DB)throw Error('Databasen är inte tillgänglig.');return env.DB;};
@@ -26,7 +27,10 @@ export async function POST(r:Request){try{
  id=crypto.randomUUID();const plan={theme:'',notes:'',budget:null,expected:[],participants:[user],samples:[]};
  await db().prepare('INSERT INTO tastings(id,owner,status,title,date,data,token,version) VALUES(?,?,?,?,?,?,?,1)').bind(id,user,'draft',String(b.title||'Ny provning').slice(0,150),'',JSON.stringify(plan),crypto.randomUUID()+crypto.randomUUID()).run();return reply(await detail(id,user));}
  const s:any=await db().prepare('SELECT * FROM tastings WHERE id=?').bind(id).first();if(!s)throw Error('Provningen finns inte.');
+ // Test tastings and real tastings never share people.
+ const sameWorld=(u:string)=>isTestUser(u)===isTestUser(s.owner);
  if(b.action==='join'){
+ if(!sameWorld(user))throw Error(isTestUser(user)?'Testpersoner kan bara delta i testprovningar.':'Det här är en testprovning.');
  if(s.status!=='active'||b.token!==s.token)throw Error('Inbjudan är ogiltig eller provningen är inte öppen.');
  const name=String(b.name||'').trim().slice(0,60);if(!name)throw Error('Ange ditt namn.');
  await db().prepare("INSERT INTO members(session,user,name) SELECT ?,?,? WHERE EXISTS(SELECT 1 FROM tastings WHERE id=? AND status='active') ON CONFLICT(session,user) DO UPDATE SET name=excluded.name").bind(id,user,name,id).run();return reply(await detail(id,user));}
@@ -40,7 +44,7 @@ export async function POST(r:Request){try{
  await db().prepare('UPDATE members SET paid=? WHERE session=? AND user=?').bind(b.paid?1:0,id,user).run();return reply(await detail(id,user));}
  if(!host)throw Error('Endast värden kan göra detta.');
  if(b.action==='save'){
- if(s.status!=='draft')throw Error('Planeringen är låst under provningen.');const p=validatePlan(b.plan);const title=String(b.title||'').trim().slice(0,150);if(!title)throw Error('Ange en titel.');const date=String(b.date||'');if(date&&!/^\d{4}-\d{2}-\d{2}$/.test(date))throw Error('Ogiltigt datum.');
+ if(s.status!=='draft')throw Error('Planeringen är låst under provningen.');const p=validatePlan(b.plan);if(!(p.participants||[]).every(sameWorld))throw Error(isTestUser(user)?'Bjud bara in testpersoner till en testprovning.':'Testpersoner kan inte bjudas in till riktiga provningar.');const title=String(b.title||'').trim().slice(0,150);if(!title)throw Error('Ange en titel.');const date=String(b.date||'');if(date&&!/^\d{4}-\d{2}-\d{2}$/.test(date))throw Error('Ogiltigt datum.');
  const out=await db().prepare("UPDATE tastings SET title=?,date=?,data=?,version=version+1 WHERE id=? AND status='draft' AND version=?").bind(title,date,JSON.stringify(p),id,b.version).run();if(!out.meta.changes)throw Error('Planeringen har ändrats i en annan flik. Öppna provningen igen.');
  }else if(b.action==='start'){
  if(s.status!=='draft'||!plan.samples.length)throw Error('Lägg till minst en dryck först.');
@@ -56,6 +60,12 @@ export async function POST(r:Request){try{
  // The host puts a glass on the table; everyone's tasting mode offers to jump there.
  const n=Number(b.sample);if(s.status!=='active'||!Number.isInteger(n)||n<0||n>=plan.samples.length)throw Error('Ogiltigt prov.');
  await db().prepare("UPDATE tastings SET data=json_set(data,'$.served',?) WHERE id=? AND status='active'").bind(n,id).run();
+ }else if(b.action==='test-fill'){
+ // Test mode: random scores for every test participant who has not rated yet.
+ if(!isTestUser(s.owner)||s.status!=='active')throw Error('Fungerar bara i en pågående testprovning.');
+ const people=(await db().prepare('SELECT user FROM members WHERE session=?').bind(id).all()).results as any[];
+ const writes=people.flatMap(p=>plan.samples.map((x:any)=>db().prepare('INSERT OR IGNORE INTO ratings(session,user,sample,data) VALUES(?,?,?,?)').bind(id,p.user,x.id,JSON.stringify({score:Math.round((4+Math.random()*5.5)*2)/2,skip:false,comment:'',tags:[],guess:null}))));
+ if(writes.length)await db().batch(writes);
  }else if(b.action==='remove-participant'){
  // Someone who never showed up would otherwise block the reveal forever.
  if(s.status!=='active')throw Error('Provningen är inte pågående.');

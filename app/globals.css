@@ -224,3 +224,9 @@ nav button{color:#ead9bf;font-weight:600}
 .swish-card.paid{opacity:.85}.swish-actions{display:flex;flex-wrap:wrap;gap:10px;align-items:center}.swish-card .swish-button{background:#2a0f14;color:var(--label)}.swish-check{font-size:14px;margin:0;font-weight:600}
 .swish-host{margin-top:18px}.swish-host h3{font-size:16px;margin-bottom:4px}.swish-host small{display:block;font-size:13px;color:#5f4a39;margin-top:8px}.paid-yes{color:#3f6b4f}.paid-no{color:#9a2e1f}
 .swish-hint{font-size:14px;color:#5f4a39;margin-top:16px}.swish-hint .text-button{font-size:14px;padding:0}
+/* Admin test mode bar (app/test-mode.tsx): one fixed line on top, above the tasting mode */
+.test-bar{position:fixed;top:0;left:0;right:0;z-index:80;height:40px;display:flex;align-items:center;gap:12px;padding:0 16px;overflow-x:auto;white-space:nowrap;background:repeating-linear-gradient(135deg,#f3dc8a 0 14px,#efd47a 14px 28px);color:#2a1a17;font-size:14px;border-bottom:1px solid #c9a94a}
+body:has(.test-bar){padding-top:40px}body:has(.test-bar) .tasting-mode,body:has(.test-bar) .tm-sheet-backdrop{top:40px}
+.test-bar select{width:auto;flex:none;font:inherit;padding:3px 6px;border:1px solid #a88a35;border-radius:4px;background:#fffaf0;color:#2a1a17}
+.test-bar .text-button{flex:none;color:#2a1a17;font-size:13px}.test-bar-tabs{display:flex;align-items:center;gap:8px;font-size:13px}
+@media(max-width:760px){.test-bar-label,.test-bar-tabs,.test-bar-reset{display:none}.test-bar{gap:8px;padding:0 10px}}

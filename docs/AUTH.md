@@ -16,6 +16,15 @@
 - Profilen visar provningar och betyg från **avslöjade** provningar och från det importerade arkivet. Betyg i pågående provningar visas aldrig, inte heller på den egna profilen.
 - Det importerade arkivet innehåller bara deltagarnamn, inga konton. Administratören kopplar arkivnamn till en medlem under Medlemmar → Koppla arkivnamn.
 
+## Testläge för administratören
+
+Under Medlemmar kan en administratör starta testläget. Då skapas fyra påhittade medlemmar (`test:host`, `test:1`–`test:3`) och administratören kan använda appen som någon av dem, som värd eller deltagare och utan adminbehörighet. Varje flik minns sin egen testperson, så flera vyer kan visas samtidigt på en enhet.
+
+- Webbläsaren skickar huvudet `X-Test-User`. Servern godtar det bara när den verifierade inloggningen tillhör en administratör och bara för id som börjar med `test:`. Det går alltså inte att agera som en riktig medlem eller få adminbehörighet den vägen. En inloggning vars eget id börjar med `test:` avvisas.
+- Testprovningar och riktiga provningar delar aldrig deltagare: testpersoner kan inte bjudas in till eller ansluta till riktiga provningar och tvärtom.
+- Testprovningar visas inte i det riktiga arkivet, statistiken eller medlemslistan. Testpersonerna ser bara varandra.
+- Värden i en pågående testprovning kan fylla i slumpbetyg åt testdeltagarna. "Rensa testdata" tar bort testpersoner, testprovningar, deras betyg och profilbilder.
+
 ## Sätta upp Clerk (görs av ägaren)
 
 1. Skapa en applikation på clerk.com. Aktivera e-post som inloggningsmetod.
