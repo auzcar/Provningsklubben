@@ -8,16 +8,18 @@ import SbLink from './sb-link';
 const fmt=(n:any,d=1)=>n==null?'–':Number(n).toLocaleString('sv-SE',{maximumFractionDigits:d});
 const kr=(n:number)=>Math.round(n).toLocaleString('sv-SE')+' kr';
 type Item={key:string;name:string;article:string;productUrl:string;price:number|null;score:number|null};
-const LIST_KEY='shopping-list';
-const load=():Item[]=>{try{return JSON.parse(localStorage.getItem(LIST_KEY)||'[]');}catch{return [];}};
+// One list per signed-in member, so people sharing a browser (or test persons) keep their own.
+const listKey=(viewer:string)=>'shopping-list:'+viewer;
+const load=(key:string):Item[]=>{try{return JSON.parse(localStorage.getItem(key)||'[]');}catch{return [];}};
 
 // Every rating on a profile, filterable by drink group and style, with links to Systembolaget
 // and a personal shopping list kept in this browser.
-export default function MyRatings({tastings,own}:{tastings:any[];own:boolean}){
+export default function MyRatings({tastings,own,viewer}:{tastings:any[];own:boolean;viewer:string}){
  const all=useMemo(()=>tastings.flatMap(t=>t.samples.filter((p:any)=>p.rated&&!p.skip&&p.score!=null&&p.name).map((p:any)=>({...p,session:t.title,date:t.date,key:t.id+':'+p.id}))),[tastings]);
  const [cat,setCat]=useState('');const [sub,setSub]=useState('');const [sort,setSort]=useState('score');const [min,setMin]=useState('');const [list,setList]=useState<Item[]>([]);const [copied,setCopied]=useState(false);const [more,setMore]=useState(false);
- useEffect(()=>setList(load()),[]);
- const save=(l:Item[])=>{setList(l);try{localStorage.setItem(LIST_KEY,JSON.stringify(l));}catch{}};
+ const key=listKey(viewer);
+ useEffect(()=>setList(load(key)),[key]);
+ const save=(l:Item[])=>{setList(l);try{localStorage.setItem(key,JSON.stringify(l));}catch{}};
  const cats=categoryOrder.map(c=>({c,n:all.filter((p:any)=>p.category===c).length})).filter(x=>x.n>0);
  const subs=cat?[...new Set<string>(all.filter((p:any)=>p.category===cat&&p.subcategory).map((p:any)=>p.subcategory))].sort((a,b)=>a.localeCompare(b,'sv')):[];
  const shown=all.filter((p:any)=>(!cat||p.category===cat)&&(!sub||p.subcategory===sub)&&(!min||p.score>=Number(min)))
@@ -35,7 +37,7 @@ export default function MyRatings({tastings,own}:{tastings:any[];own:boolean}){
    <ul className="shopping-list">{list.map(i=><li key={i.key}><span><b>{i.name}</b><small>{[i.article&&'Art.nr '+i.article,i.price!=null&&kr(i.price)+' när ni provade'].filter(Boolean).join(' · ')}</small></span>{systembolagetUrl(i)&&<a className="sb-link" href={systembolagetUrl(i)} target="_blank" rel="noreferrer" aria-label={'Öppna '+i.name+' på Systembolaget'}><ArrowUpRight size={16}/></a>}<button className="icon-button" aria-label={'Ta bort '+i.name} onClick={()=>save(list.filter(x=>x.key!==i.key))}><X size={14}/></button></li>)}</ul>
    {total>0&&<div className="summary-line"><span>Ungefär</span><b>{kr(total)}</b></div>}
    <div className="row wrap"><button className="secondary small" onClick={async()=>{try{await navigator.clipboard.writeText(text);setCopied(true);setTimeout(()=>setCopied(false),2000);}catch{}}}><Copy size={14}/>{copied?'Kopierad!':'Kopiera'}</button>{typeof navigator!=='undefined'&&'share' in navigator&&<button className="secondary small" onClick={()=>navigator.share({title:'Inköpslista',text}).catch(()=>{})}><Share2 size={14}/>Dela</button>}<button className="text-button" onClick={()=>save([])}><Trash2 size={14}/>Töm</button></div>
-   <small className="muted">Systembolaget tar inte emot färdiga listor från andra sidor. Tryck på pilen vid varje flaska, så öppnas den hos Systembolaget (i appen om du har den), och lägg den i din lista eller varukorg där. Listan sparas i den här webbläsaren.</small>
+   <small className="muted">Systembolaget tar inte emot färdiga listor från andra sidor. Tryck på pilen vid varje flaska, så öppnas den hos Systembolaget (i appen om du har den), och lägg den i din lista eller varukorg där. Listan sparas för dig i den här webbläsaren.</small>
   </div>}
   <ul className="rating-list">{(more?shown:shown.slice(0,15)).map((p:any)=><li key={p.key}>
    <span className="rating-pill">{fmt(p.score)}</span>
