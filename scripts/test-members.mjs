@@ -192,7 +192,10 @@ await call(members,'boss','/api/members',{action:'prepare',email:'friend@club.te
 let prep=await call(members,'boss','/api/members',{action:'prepare',email:'Friend@Club.test',name:'Kompisen',historyNames:['Rickard'],image:png});
 assert.deepEqual(prep.prepared.map(p=>[p.email,p.name,p.historyNames[0],!!p.photo]),[['friend@club.test','Kompisen','Rickard',true]]);
 assert.equal((await call(members,'guest','/api/members')).prepared,undefined);
-prep=await call(members,'boss','/api/members',{action:'prepare',email:'friend@club.test',name:'Kompisen K',historyNames:['Rickard'],keepPhoto:true});assert.ok(prep.prepared[0].photo);
+prep=await call(members,'boss','/api/members',{action:'prepare',email:'fiend@club.test',previous:'friend@club.test',name:'Kompisen K',historyNames:['Rickard'],keepPhoto:true});
+assert.deepEqual(prep.prepared.map(p=>p.email),['fiend@club.test']);assert.ok(prep.prepared[0].photo);
+prep=await call(members,'boss','/api/members',{action:'prepare',email:'friend@club.test',previous:'fiend@club.test',name:'Kompisen K',historyNames:['Rickard'],keepPhoto:true});
+assert.deepEqual(prep.prepared.map(p=>p.email),['friend@club.test']);assert.ok(prep.prepared[0].photo);
 s=await call(session,'friend','/api/session');assert.equal(s.me.name,'Kompisen K');assert.equal(s.me.avatar,1);
 let fp=await call(profile,'friend','/api/profile?user=friend');assert.deepEqual(fp.profile.historyNames,['Rickard']);
 assert.equal((await call(members,'boss','/api/members')).prepared.length,0);

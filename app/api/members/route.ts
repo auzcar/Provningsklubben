@@ -43,9 +43,11 @@ export async function POST(r:Request){try{
   if(await db.prepare('SELECT 1 FROM profiles WHERE lower(email)=?').bind(email).first())throw Error('Det finns redan en medlem med den e-postadressen.');
   const name=String(b.name||'').trim().slice(0,60);if(!name)throw Error('Ange ett namn.');
   const history=JSON.stringify([...new Set((Array.isArray(b.historyNames)?b.historyNames:[]).map((x:any)=>String(x).slice(0,60)))].slice(0,10));
-  const old:any=await db.prepare('SELECT mime,avatar FROM pending_profiles WHERE email=?').bind(email).first();
+  // Editing may change the email: the preparation under the previous address is replaced, not kept.
+  const previous=String(b.previous||email).trim().toLowerCase();
+  const old:any=await db.prepare('SELECT mime,avatar FROM pending_profiles WHERE email=?').bind(previous).first();
   const photo=b.image?parseAvatar(b.image):b.keepPhoto&&old?.avatar?{mime:old.mime,data:old.avatar}:{mime:'',data:''};
-  await db.prepare('INSERT INTO pending_profiles(email,name,history_names,mime,avatar,created_at) VALUES(?,?,?,?,?,?) ON CONFLICT(email) DO UPDATE SET name=excluded.name,history_names=excluded.history_names,mime=excluded.mime,avatar=excluded.avatar').bind(email,name,history,photo.mime,photo.data,new Date().toISOString()).run();
+  await db.batch([...(previous!==email?[db.prepare('DELETE FROM pending_profiles WHERE email=?').bind(previous)]:[]),db.prepare('INSERT INTO pending_profiles(email,name,history_names,mime,avatar,created_at) VALUES(?,?,?,?,?,?) ON CONFLICT(email) DO UPDATE SET name=excluded.name,history_names=excluded.history_names,mime=excluded.mime,avatar=excluded.avatar').bind(email,name,history,photo.mime,photo.data,new Date().toISOString())]);
  }else if(b.action==='unprepare'){
   await db.prepare('DELETE FROM pending_profiles WHERE email=?').bind(String(b.email||'').trim().toLowerCase()).run();
  }else if(b.action==='update'){

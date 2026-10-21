@@ -6,12 +6,12 @@ import {resize} from './profile';
 // Admin: prepare a friend's profile (name, archive names, photo) before they ever sign in.
 // It is applied automatically the first time someone signs in with that verified email.
 export default function PrepareMembers({data,run,busy}:{data:any;run:(body:any,done?:string)=>Promise<boolean>;busy:boolean}){
- const blank={email:'',name:'',historyNames:[] as string[],photo:'',image:'',keepPhoto:false};
+ const blank={email:'',previous:'',name:'',historyNames:[] as string[],photo:'',image:'',keepPhoto:false};
  const [f,setF]=useState(blank);const [err,setErr]=useState('');const file=useRef<HTMLInputElement>(null);
  const prepared:any[]=data.prepared||[];
- const taken=new Set<string>([...data.members.flatMap((m:any)=>m.historyNames||[]),...prepared.filter(p=>p.email!==f.email).flatMap((p:any)=>p.historyNames)]);
+ const taken=new Set<string>([...data.members.flatMap((m:any)=>m.historyNames||[]),...prepared.filter(p=>p.email!==(f.previous||f.email)).flatMap((p:any)=>p.historyNames)]);
  const pick=async(x?:File)=>{if(!x)return;try{const image=await resize(x);setF({...f,image,photo:image,keepPhoto:false});setErr('');}catch(e:any){setErr(e.message);}finally{if(file.current)file.current.value='';}};
- const save=async()=>{if(await run({action:'prepare',email:f.email,name:f.name,historyNames:f.historyNames,image:f.image||undefined,keepPhoto:f.keepPhoto},`${f.name} är förberedd.`))setF(blank);};
+ const save=async()=>{if(await run({action:'prepare',email:f.email,previous:f.previous||undefined,name:f.name,historyNames:f.historyNames,image:f.image||undefined,keepPhoto:f.keepPhoto},`${f.name} är förberedd.`))setF(blank);};
  return <section className="panel"><div className="eyebrow">ADMINISTRATION</div><h2>Förbered medlemmar</h2>
   <p className="muted fine">Lägg in namn, bild och namn i arkivet i förväg. Inget skickas till personen. När hen loggar in första gången med samma e-postadress kopplas allt automatiskt till profilen, så att deras gamla betyg och bild finns där direkt.</p>
   <div className="prepare-form">
@@ -28,7 +28,7 @@ export default function PrepareMembers({data,run,busy}:{data:any;run:(body:any,d
   {prepared.length>0&&<ul className="prepared-list">{prepared.map(p=><li key={p.email}>
    <span className="avatar" style={{width:40,height:40}}>{p.photo?<img src={p.photo} alt=""/>:p.name.slice(0,1)}</span>
    <span><b>{p.name}</b><small>{p.email}{p.historyNames.length?' · '+p.historyNames.join(', '):''}</small></span>
-   <button className="icon-button" aria-label={'Ändra '+p.name} onClick={()=>setF({email:p.email,name:p.name,historyNames:p.historyNames,photo:p.photo,image:'',keepPhoto:!!p.photo})}><Pencil size={14}/></button>
+   <button className="icon-button" aria-label={'Ändra '+p.name} onClick={()=>setF({email:p.email,previous:p.email,name:p.name,historyNames:p.historyNames,photo:p.photo,image:'',keepPhoto:!!p.photo})}><Pencil size={14}/></button>
    <button className="icon-button" aria-label={'Ta bort förberedelsen för '+p.name} onClick={()=>confirm(`Ta bort förberedelsen för ${p.name}?`)&&run({action:'unprepare',email:p.email},'Förberedelsen är borttagen.')}><Trash2 size={14}/></button>
   </li>)}</ul>}
  </section>;
