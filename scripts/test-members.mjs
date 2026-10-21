@@ -148,7 +148,7 @@ assert.equal(env.sqlite.prepare('SELECT owner FROM tastings WHERE id=?').get(rom
 assert.ok((await call(history,'guest','/api/history')).sessions.some(x=>x.id===rom.id));
 assert.equal((await call(imp,'boss','/api/import',full)).full.tastings,0);
 await call(members,'boss','/api/members',{action:'test-reset'});
-// An admin can open (and so remove) a revealed tasting hosted by someone else; others cannot.
+// Before the reveal only participants can open a tasting; afterwards any member can (shared links).
 let gk=await call(club,'guest','/api/club',{action:'create',title:'Gästens kväll'});
 gk=await call(club,'guest','/api/club',{action:'save',id:gk.id,version:gk.version,title:'Gästens kväll',plan:{theme:'',notes:'',budget:null,expected:[],participants:['guest'],samples:[{id:'q1',name:'Q',number:1,type:'Rom'}]}});
 gk=await call(club,'guest','/api/club',{action:'start',id:gk.id});
@@ -156,7 +156,7 @@ await call(club,'guest','/api/club',{action:'vote',id:gk.id,sample:'q1',vote:{sc
 await call(club,'boss','/api/club?id='+gk.id,undefined,400);
 await call(club,'guest','/api/club',{action:'reveal',id:gk.id});
 assert.equal((await call(club,'boss','/api/club?id='+gk.id)).status,'revealed');
-await call(club,'stranger','/api/club?id='+gk.id,undefined,400);
+assert.equal((await call(club,'stranger','/api/club?id='+gk.id)).status,'revealed');
 // Admin can complete archive data; nobody else can, and scores stay as they were.
 await call(history,'guest','/api/history',{action:'edit',session:'h2',sample:'g1',fields:{price:399}},403);
 await call(history,'boss','/api/history',{action:'edit',session:'h2',sample:'g1',fields:{productUrl:'https://evil.test/x'}},400);
