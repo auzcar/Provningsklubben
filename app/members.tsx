@@ -6,6 +6,7 @@ import {Avatar} from './profile';
 import type {Me} from './auth-gate';
 import {TestModePanel} from './test-mode';
 import BackupPanel from './backup-panel';
+import PrepareMembers from './prepare-members';
 
 export default function Members({me,openProfile}:{me:Me;openProfile:(id:string)=>void}){
  const [data,setData]=useState<any>(null);const [error,setError]=useState('');const [notice,setNotice]=useState('');const [email,setEmail]=useState('');const [busy,setBusy]=useState(false);const [linking,setLinking]=useState<any>(null);
@@ -30,6 +31,7 @@ export default function Members({me,openProfile}:{me:Me;openProfile:(id:string)=
     {m.id!==me.id&&<button className="text-button danger" disabled={busy} onClick={()=>confirm(`Inaktivera ${m.name}? Personen kan inte längre logga in i klubben.`)&&run({action:'update',user:m.id,status:'removed'},m.name+' är inaktiverad.')}><UserX size={14}/>Inaktivera</button>}
    </div>}
   </article>)}</div>
+  {me.admin&&<PrepareMembers data={data} run={run} busy={busy}/>}
   {me.admin&&<BackupPanel/>}
   {me.admin&&<TestModePanel/>}
   {me.admin&&<section className="panel"><div className="eyebrow">ADMINISTRATION</div><h2>Importera historik</h2><p className="muted fine">Välj en säkerhetskopia från appen, eller <b>recovery-data.json</b> eller <b>history.json</b> från den ursprungliga exporten. Filen skickas direkt till klubbens databas. Befintliga provningar skrivs aldrig över, så importen kan köras igen utan risk.</p><label className="secondary file-button"><Upload size={16}/>{busy?'Importerar…':'Välj fil'}<input type="file" accept=".json,application/json" hidden disabled={busy} onChange={async e=>{const f=e.target.files?.[0];e.target.value='';if(!f)return;setBusy(true);setError('');setNotice('');try{let json:any;try{json=JSON.parse(await f.text());}catch{throw Error('Filen är inte giltig JSON.');}const d=await api('/api/import',json);setNotice(d.full?`Klart: ${d.full.tastings} provningar, ${d.full.ratings} betyg, ${d.full.profiles} medlemmar och ${d.full.historical} arkivprovningar lades tillbaka. Det som redan fanns rördes inte.`:`Klart: ${d.historical} nya provningar i arkivet (filen innehöll ${d.total.historical} provningar, ${d.total.samples} drycker och ${d.total.ratings} betyg)${d.tastings?`, ${d.tastings} pågående provning med dig som värd`:''}. Koppla nu arkivnamnen till medlemmarna.`);setData(await api('/api/members'));}catch(err:any){setError(err.message);}finally{setBusy(false);}}}/></label></section>}

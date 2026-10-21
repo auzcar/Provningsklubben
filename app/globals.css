@@ -271,3 +271,7 @@ body:has(.test-bar){padding-top:40px}body:has(.test-bar) .tasting-mode,body:has(
 .archive-head{width:100%;background:none;border:0;color:inherit;font:inherit;text-align:left;cursor:pointer}.archive-head .flip{transform:rotate(180deg)}.archive-head .result-score{display:flex;align-items:baseline;gap:4px}
 .archive-thumb{width:34px;height:46px;object-fit:contain}
 @media(max-width:760px){.hero.has-next::after{display:none}}
+/* Prepared members (app/prepare-members.tsx) */
+.prepare-form{display:flex;gap:14px;align-items:flex-start;margin:10px 0}.prepare-fields{flex:1;display:grid;gap:8px;min-width:0}
+.prepare-photo{width:84px;height:84px;flex:none;border-radius:50%;border:1px dashed #c9b48e;background:transparent;color:inherit;display:grid;place-items:center;overflow:hidden;cursor:pointer;padding:0}.prepare-photo img{width:100%;height:100%;object-fit:cover}
+.prepared-list{list-style:none;margin:14px 0 0;padding:0;display:grid;gap:6px}.prepared-list li{display:flex;align-items:center;gap:10px;padding:6px 0;border-top:1px solid #d8c7a633}.prepared-list li>span:nth-child(2){display:flex;flex-direction:column;flex:1;min-width:0}.prepared-list small{color:var(--muted);font-size:12px;overflow-wrap:anywhere}

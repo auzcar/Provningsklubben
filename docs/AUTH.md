@@ -16,6 +16,10 @@
 - Profilen visar provningar och betyg från **avslöjade** provningar och från det importerade arkivet. Betyg i pågående provningar visas aldrig, inte heller på den egna profilen.
 - Det importerade arkivet innehåller bara deltagarnamn, inga konton. Administratören kopplar arkivnamn till en medlem under Medlemmar → Koppla arkivnamn.
 
+## Förbered medlemmar
+
+Under Medlemmar → Förbered medlemmar kan en administratör lägga in namn, profilbild och arkivnamn för en vän innan hen har ett konto. Inget skickas ut. Förberedelsen kopplas till e-postadressen och används en gång, när en ny profil skapas för en inloggning med samma e-postadress. I Clerk-läget krävs att e-postadressen är verifierad. Därefter tas förberedelsen bort. Den går inte att göra för en e-postadress som redan tillhör en medlem.
+
 ## Testläge för administratören
 
 Under Medlemmar kan en administratör starta testläget. Då skapas fyra påhittade medlemmar (`test:host`, `test:1`–`test:3`) och administratören kan använda appen som någon av dem, som värd eller deltagare och utan adminbehörighet. Varje flik minns sin egen testperson, så flera vyer kan visas samtidigt på en enhet.
