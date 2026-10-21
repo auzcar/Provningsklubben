@@ -9,6 +9,7 @@ export const BACKUP_TABLES={
  ratings:['session','user','sample','data'],
  profiles:['user','name','email','role','status','bio','history_names','avatar_version','swish','created_at'],
  avatars:['user','mime','data'],
+ shopping_items:['user','key','data','created_at'],
 } as const;
 export type Backup={format:2;created:string;tables:Record<string,Record<string,unknown>[]>};
 
