@@ -185,6 +185,19 @@ sl=await call(shop,'guest','/api/shopping',{action:'remove',key:'h2:g1'});assert
 sl=await call(shop,'guest','/api/shopping',{action:'clear'});assert.equal(sl.items.length,0);
 await call(shop,null,'/api/shopping',undefined,401);
 
+// Prepared members: the admin sets name, archive names and photo in advance; applied on first sign-in.
+await call(members,'guest','/api/members',{action:'prepare',email:'friend@club.test',name:'Kompisen'},403);
+await call(members,'boss','/api/members',{action:'prepare',email:'guest@club.test',name:'Dubblett'},400);
+await call(members,'boss','/api/members',{action:'prepare',email:'friend@club.test',name:'Kompisen',historyNames:['Rickard'],image:'data:image/svg+xml;base64,PHN2Zy8+'},400);
+let prep=await call(members,'boss','/api/members',{action:'prepare',email:'Friend@Club.test',name:'Kompisen',historyNames:['Rickard'],image:png});
+assert.deepEqual(prep.prepared.map(p=>[p.email,p.name,p.historyNames[0],!!p.photo]),[['friend@club.test','Kompisen','Rickard',true]]);
+assert.equal((await call(members,'guest','/api/members')).prepared,undefined);
+prep=await call(members,'boss','/api/members',{action:'prepare',email:'friend@club.test',name:'Kompisen K',historyNames:['Rickard'],keepPhoto:true});assert.ok(prep.prepared[0].photo);
+s=await call(session,'friend','/api/session');assert.equal(s.me.name,'Kompisen K');assert.equal(s.me.avatar,1);
+let fp=await call(profile,'friend','/api/profile?user=friend');assert.deepEqual(fp.profile.historyNames,['Rickard']);
+assert.equal((await call(members,'boss','/api/members')).prepared.length,0);
+s=await call(session,'friend','/api/session');assert.equal(s.me.name,'Kompisen K');
+
 // Clerk mode: identity headers are ignored; only a valid session token for this origin counts.
 const {privateKey,publicKey}=generateKeyPairSync('rsa',{modulusLength:2048});
 const jwtKey=publicKey.export({type:'spki',format:'pem'}).toString();
@@ -200,4 +213,4 @@ await call(club,null,'/api/club',undefined,401,{Authorization:'Bearer '+token({a
 await call(club,null,'/api/club',undefined,401,{Authorization:'Bearer '+token({exp:Math.floor(Date.now()/1000)-120})});
 await call(club,null,'/api/club',undefined,401,{Authorization:'Bearer '+token().slice(0,-4)+'AAAA'});
 await call(club,null,'/api/club',undefined,200,{Authorization:'Bearer '+token()});
-console.log('PASS: membership, admin rules, removal, profiles without premature disclosure, archive linking, avatar validation, participants, cost split, Swish, deletion, backup import, admin test mode isolation, full backup and restore, admin removal of revealed tastings, admin archive editing, synced shopping list, Clerk token verification.');
+console.log('PASS: membership, admin rules, removal, profiles without premature disclosure, archive linking, avatar validation, participants, cost split, Swish, deletion, backup import, admin test mode isolation, full backup and restore, admin removal of revealed tastings, admin archive editing, synced shopping list, prepared members, Clerk token verification.');

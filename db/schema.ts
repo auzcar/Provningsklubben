@@ -10,3 +10,6 @@ export const profiles=sqliteTable('profiles',{user:text('user').primaryKey(),nam
 export const avatars=sqliteTable('avatars',{user:text('user').primaryKey(),mime:text('mime').notNull(),data:text('data').notNull()});
 // Personal shopping list on the profile, so it follows the member between devices.
 export const shoppingItems=sqliteTable('shopping_items',{user:text('user').notNull(),key:text('key').notNull(),data:text('data').notNull(),createdAt:text('created_at').notNull()},t=>[primaryKey({columns:[t.user,t.key]})]);
+// Members the admin has prepared before they first sign in: name, archive names and photo,
+// applied when someone signs in with this verified email (lib/pending.ts).
+export const pendingProfiles=sqliteTable('pending_profiles',{email:text('email').primaryKey(),name:text('name').notNull(),historyNames:text('history_names').notNull().default('[]'),mime:text('mime').notNull().default(''),avatar:text('avatar').notNull().default(''),createdAt:text('created_at').notNull()});

@@ -26,7 +26,7 @@ export function Avatar({user,version,name,size=44}:{user:string;version:number;n
 }
 
 // Crop to a square and shrink in the browser so uploads stay small.
-async function resize(file:File){
+export async function resize(file:File){
  if(!file.type.startsWith('image/'))throw Error('Välj en bildfil.');
  const bitmap=await createImageBitmap(file);const side=Math.min(bitmap.width,bitmap.height),out=320;
  const canvas=document.createElement('canvas');canvas.width=canvas.height=out;

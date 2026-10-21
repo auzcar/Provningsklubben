@@ -1,5 +1,6 @@
 import {verifyToken,createClerkClient} from '@clerk/backend';
 import {isTestUser} from '@/lib/test-users';
+import {applyPending} from '@/lib/pending';
 
 // Server-side identity and club membership. Every API route calls requireMember();
 // the client never decides who it is.
@@ -55,7 +56,9 @@ export async function findMember(r:Request,env:AuthEnv,{ignoreTest=false}={}):Pr
  let row:any=await db.prepare('SELECT * FROM profiles WHERE user=?').bind(who.id).first();
  if(!row){
   const d=await details(env,who);
-  await db.prepare('INSERT OR IGNORE INTO profiles(user,name,email,created_at) VALUES(?,?,?,?)').bind(who.id,d.name.slice(0,60),d.email,new Date().toISOString()).run();
+  const created=await db.prepare('INSERT OR IGNORE INTO profiles(user,name,email,created_at) VALUES(?,?,?,?)').bind(who.id,d.name.slice(0,60),d.email,new Date().toISOString()).run();
+  // A brand-new member with a verified email may have been prepared by the admin (lib/pending.ts).
+  if(created.meta.changes)await applyPending(db,who.id,d.email);
   row=await db.prepare('SELECT * FROM profiles WHERE user=?').bind(who.id).first();
  }
  if(row.status!=='active')throw new AuthError('Ditt medlemskap är inaktiverat. Kontakta klubbens administratör.',403);
