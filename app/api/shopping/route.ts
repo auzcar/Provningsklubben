@@ -10,7 +10,7 @@ function clean(i:any){
  const num=(v:any,max:number)=>v==null||v===''?null:Number.isFinite(Number(v))&&Number(v)>=0&&Number(v)<=max?Number(v):null;
  return {key,data:JSON.stringify({key,name:String(i.name||'').slice(0,200),article,productUrl,price:num(i.price,100000),score:num(i.score,10)})};
 }
-async function list(db:D1Database,user:string){return {items:((await db.prepare('SELECT data FROM shopping_items WHERE user=? ORDER BY created_at').bind(user).all()).results as any[]).map(r=>JSON.parse(r.data))};}
+async function list(db:D1Database,user:string){return {items:((await db.prepare('SELECT data FROM shopping_items WHERE user=? ORDER BY created_at,rowid').bind(user).all()).results as any[]).map(r=>JSON.parse(r.data))};}
 export async function GET(r:Request){try{const me=await requireMember(r,env);return reply(await list(env.DB!,me.id));}catch(e){return fail(e)}}
 export async function POST(r:Request){try{
  if(!sameOrigin(r))return reply({error:'Ogiltig begäran.'},403);
