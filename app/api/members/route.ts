@@ -25,7 +25,7 @@ export async function POST(r:Request){try{
   if(b.action==='test-setup')await db.batch(TEST_USERS.map(u=>db.prepare("INSERT OR IGNORE INTO profiles(user,name,email,created_at) VALUES(?,?,'',?)").bind(u.id,u.name,new Date().toISOString())));
   else{
    const own="SELECT id FROM tastings WHERE owner LIKE 'test:%'";
-   await db.batch([db.prepare(`DELETE FROM ratings WHERE session IN (${own}) OR user LIKE 'test:%'`),db.prepare(`DELETE FROM members WHERE session IN (${own}) OR user LIKE 'test:%'`),db.prepare("DELETE FROM tastings WHERE owner LIKE 'test:%'"),db.prepare("DELETE FROM avatars WHERE user LIKE 'test:%'"),db.prepare("DELETE FROM profiles WHERE user LIKE 'test:%'")]);
+   await db.batch([db.prepare(`DELETE FROM ratings WHERE session IN (${own}) OR user LIKE 'test:%'`),db.prepare(`DELETE FROM members WHERE session IN (${own}) OR user LIKE 'test:%'`),db.prepare("DELETE FROM tastings WHERE owner LIKE 'test:%'"),db.prepare("DELETE FROM avatars WHERE user LIKE 'test:%'"),db.prepare("DELETE FROM shopping_items WHERE user LIKE 'test:%'"),db.prepare("DELETE FROM profiles WHERE user LIKE 'test:%'")]);
   }
   return reply({ok:true});
  }

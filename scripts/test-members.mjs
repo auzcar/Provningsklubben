@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import {generateKeyPairSync,createSign} from 'node:crypto';
 import {createDb,route} from './test-harness.mjs';
 const env={...createDb(),ADMIN_EMAILS:'Boss@Club.test'};
-const backupRoute=await route('backup',env),imp=await route('import',env),club=await route('club',env),members=await route('members',env),profile=await route('profile',env),avatar=await route('avatar',env),session=await route('session',env),history=await route('history',env);
+const backupRoute=await route('backup',env),shop=await route('shopping',env),imp=await route('import',env),club=await route('club',env),members=await route('members',env),profile=await route('profile',env),avatar=await route('avatar',env),session=await route('session',env),history=await route('history',env);
 const headers=(user,extra={})=>({...(user?{'oai-authenticated-user-id':user,'oai-authenticated-user-email':user+'@club.test'}:{}),'Content-Type':'application/json','Origin':'https://test.local',...extra});
 const call=async(handler,user,path,body,status=200,extra)=>{const r=await handler[body?'POST':'GET'](new Request('https://test.local'+path,{method:body?'POST':'GET',headers:headers(user,extra),...(body?{body:JSON.stringify(body)}:{})}));const d=r.headers.get('content-type')?.includes('json')?await r.json():r;assert.equal(r.status,status,JSON.stringify(d));return d;};
 
@@ -174,6 +174,17 @@ assert.ok(statements<=2,'statements '+statements);
 env.sqlite.prepare("DELETE FROM ratings WHERE session='bulk'").run();
 
 
+// Shopping list lives on the profile: own list only, validated, synced across devices.
+let sl=await call(shop,'guest','/api/shopping',{action:'add',item:{key:'h2:g1',name:'Hendricks',article:'8873',productUrl:'https://www.systembolaget.se/produkt/sprit/hendricks-887301/',price:399,score:8}});
+assert.equal(sl.items.length,1);assert.equal(sl.items[0].name,'Hendricks');
+await call(shop,'guest','/api/shopping',{action:'add',item:{key:'x',name:'Ond',productUrl:'https://evil.test/'}},400);
+assert.equal((await call(shop,'boss','/api/shopping')).items.length,0);
+sl=await call(shop,'guest','/api/shopping',{action:'import',items:[{key:'h2:g1',name:'Dubblett'},{key:'a:b',name:'Från mobilen'}]});
+assert.deepEqual(sl.items.map(i=>i.name),['Hendricks','Från mobilen']);
+sl=await call(shop,'guest','/api/shopping',{action:'remove',key:'h2:g1'});assert.deepEqual(sl.items.map(i=>i.key),['a:b']);
+sl=await call(shop,'guest','/api/shopping',{action:'clear'});assert.equal(sl.items.length,0);
+await call(shop,null,'/api/shopping',undefined,401);
+
 // Clerk mode: identity headers are ignored; only a valid session token for this origin counts.
 const {privateKey,publicKey}=generateKeyPairSync('rsa',{modulusLength:2048});
 const jwtKey=publicKey.export({type:'spki',format:'pem'}).toString();
@@ -189,4 +200,4 @@ await call(club,null,'/api/club',undefined,401,{Authorization:'Bearer '+token({a
 await call(club,null,'/api/club',undefined,401,{Authorization:'Bearer '+token({exp:Math.floor(Date.now()/1000)-120})});
 await call(club,null,'/api/club',undefined,401,{Authorization:'Bearer '+token().slice(0,-4)+'AAAA'});
 await call(club,null,'/api/club',undefined,200,{Authorization:'Bearer '+token()});
-console.log('PASS: membership, admin rules, removal, profiles without premature disclosure, archive linking, avatar validation, participants, cost split, Swish, deletion, backup import, admin test mode isolation, full backup and restore, admin removal of revealed tastings, admin archive editing, Clerk token verification.');
+console.log('PASS: membership, admin rules, removal, profiles without premature disclosure, archive linking, avatar validation, participants, cost split, Swish, deletion, backup import, admin test mode isolation, full backup and restore, admin removal of revealed tastings, admin archive editing, synced shopping list, Clerk token verification.');
