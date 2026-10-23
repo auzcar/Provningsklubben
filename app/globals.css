@@ -275,3 +275,14 @@ body:has(.test-bar){padding-top:40px}body:has(.test-bar) .tasting-mode,body:has(
 .prepare-form{display:flex;gap:14px;align-items:flex-start;margin:10px 0}.prepare-fields{flex:1;display:grid;gap:8px;min-width:0}
 .prepare-photo{width:84px;height:84px;flex:none;border-radius:50%;border:1px dashed #c9b48e;background:transparent;color:inherit;display:grid;place-items:center;overflow:hidden;cursor:pointer;padding:0}.prepare-photo img{width:100%;height:100%;object-fit:cover}
 .prepared-list{list-style:none;margin:14px 0 0;padding:0;display:grid;gap:6px}.prepared-list li{display:flex;align-items:center;gap:10px;padding:6px 0;border-top:1px solid #d8c7a633}.prepared-list li>span:nth-child(2){display:flex;flex-direction:column;flex:1;min-width:0}.prepared-list small{color:var(--muted);font-size:12px;overflow-wrap:anywhere}
+/* Home top list (app/home-toplist.tsx) */
+.home-toplist{margin-top:8px}.home-toplist .chip-row{margin-top:0}
+.toplist{list-style:none;margin:10px 0 0;padding:0;display:grid;gap:6px}
+.toplist li{display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--label-2);border:1px solid #d8c7a6;border-radius:6px}
+.toplist img,.toplist-noimg{width:28px;height:40px;object-fit:contain;flex:none}
+.toplist-rank{width:26px;flex:none;text-align:center;font-family:var(--serif);font-size:20px;font-weight:700;color:#a07a3c}.toplist-rank.r1{color:#c99a2e}
+.toplist-main{flex:1;min-width:0;display:flex;flex-direction:column;align-items:flex-start;background:none;border:0;padding:0;color:inherit;font:inherit;text-align:left;cursor:pointer}.toplist-main b{font-weight:600}.toplist-main small{font-size:12px;color:var(--muted)}
+.toplist-score{display:flex;flex-direction:column;align-items:flex-end;font-family:var(--serif);font-size:22px;font-weight:700;line-height:1}.toplist-score small{font-family:inherit;font-size:11px;font-weight:500;color:var(--muted);margin-top:3px}
+.toplist-go{flex:none;color:var(--muted)}
+@media(max-width:760px){.toplist img,.toplist-noimg{display:none}.toplist-go{display:none}}
+.brand-logo{width:46px;height:46px;border-radius:50%;flex:none;display:block;box-shadow:0 0 0 1px #c9a24a55}

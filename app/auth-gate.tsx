@@ -39,7 +39,7 @@ export default function AuthGate(){
  },[state.phase,clerk]);
  const signOut=state.mode==='clerk'&&clerk?()=>clerk.signOut({redirectUrl:'/'}):undefined;
  if(state.phase==='ready')return <Club me={state.me||null} signOut={signOut}/>;
- return <div className="gate"><div className="gate-card"><a href="/" className="brand"><span className="brand-mark"><Wine size={24}/></span><span>Provnings<br/><b>klubben.</b></span></a>
+ return <div className="gate"><div className="gate-card"><a href="/" className="brand"><img className="brand-logo" src="/logo.png" alt="" width={46} height={46}/><span>Provnings<br/><b>klubben.</b></span></a>
   {state.phase==='loading'&&<div className="loading"><LoaderCircle className="spin"/>Hämtar klubben…</div>}
   {state.phase==='signin'&&<><div className="eyebrow">ENDAST FÖR MEDLEMMAR</div><h1>Välkommen in</h1><p className="intro">Logga in med kontot du fick inbjudan till. Nya medlemmar bjuds in av klubbens administratör.</p><div ref={mount} className="clerk-mount"/></>}
   {state.phase==='blocked'&&<><h1>Ingen åtkomst</h1><p className="intro">{state.message}</p>{signOut&&<button className="secondary" onClick={signOut}>Logga ut</button>}</>}
