@@ -278,7 +278,7 @@ body:has(.test-bar){padding-top:40px}body:has(.test-bar) .tasting-mode,body:has(
 /* Home top list (app/home-toplist.tsx) */
 .home-toplist{margin-top:8px}.home-toplist .chip-row{margin-top:0}
 .toplist{list-style:none;margin:10px 0 0;padding:0;display:grid;gap:6px}
-.toplist li{display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--label-2);border:1px solid #d8c7a6;border-radius:6px}
+.toplist li{--muted:#5a4636;color:#2a1a17;display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--label-2);border:1px solid #d8c7a6;border-radius:6px}
 .toplist img,.toplist-noimg{width:28px;height:40px;object-fit:contain;flex:none}
 .toplist-rank{width:26px;flex:none;text-align:center;font-family:var(--serif);font-size:20px;font-weight:700;color:#a07a3c}.toplist-rank.r1{color:#c99a2e}
 .toplist-main{flex:1;min-width:0;display:flex;flex-direction:column;align-items:flex-start;background:none;border:0;padding:0;color:inherit;font:inherit;text-align:left;cursor:pointer}.toplist-main b{font-weight:600}.toplist-main small{font-size:12px;color:var(--muted)}
