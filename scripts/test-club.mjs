@@ -65,3 +65,20 @@ console.log('Snacks test passed');
  assert.match(tastingIcs({id:'b',title:'B',date:'2026-07-01',time:'23:00'},'u'),/DTEND;TZID=Europe\/Stockholm:20260702T020000/);
  assert.ok(ics.split('\r\n').every(l=>new TextEncoder().encode(l).length<=75));}
 console.log('Time test passed');
+// The evening program: drinks follow the tasting order, other items stay where they were put.
+{const P=await import('../.sites-runtime/tests/lib/program.mjs');
+ let t=await post('host',{action:'create',title:'Upplägg'});const tid=t.id;
+ const samples=[{id:'a',name:'A'},{id:'b',name:'B'},{id:'c',name:'C'}];
+ t=await post('host',{action:'save',id:tid,version:t.version,title:'Upplägg',date:'',plan:{...t.plan,samples,snacks:[{id:'s1',name:'Ost'}],
+  program:[{id:'w',kind:'other',title:'Välkomstdrink',time:'18:30'},{id:'pa',kind:'drink',sample:'a',notes:'Rumstempererad',snacks:['s1','gone']},{id:'m',kind:'meal',title:'Middag',notes:'Lamm',time:'25:00'},{id:'x',kind:'drink',sample:'zzz'},{id:'pb',kind:'drink',sample:'b'},{id:'pb2',kind:'drink',sample:'b'},{id:'bad',kind:'party'}]}});
+ assert.deepEqual(t.plan.program.map(x=>[x.kind,x.sample||x.title]),[['other','Välkomstdrink'],['drink','a'],['meal','Middag'],['drink','b'],['drink','c']]);
+ assert.deepEqual(t.plan.program[1].snacks,['s1']);assert.equal(t.plan.program[2].time,'');
+ // Reordering the drinks keeps the meal in its place and the notes with their drink.
+ t=await post('host',{action:'save',id:tid,version:t.version,title:'Upplägg',date:'',plan:{...t.plan,samples:[samples[2],samples[0],samples[1]]}});
+ assert.deepEqual(t.plan.program.map(x=>x.sample||x.title),['Välkomstdrink','c','Middag','a','b']);assert.equal(t.plan.program[3].notes,'Rumstempererad');
+ const mv=P.moveItem(t.plan.program,t.plan.samples,3,-1);assert.deepEqual(mv.program.map(x=>x.sample||x.title),['Välkomstdrink','c','a','Middag','b']);assert.deepEqual(mv.samples.map(s=>s.id),['c','a','b']);
+ const sw=P.moveItem(mv.program,mv.samples,1,1);assert.deepEqual(sw.samples.map(s=>s.id),['a','c','b']);
+ assert.deepEqual(P.suggestTimes(t.plan.program,'23:30').map(x=>x.time),['23:30','23:40','23:55','00:55','01:10']);
+ // Older plans without a program get one from the drinks.
+ assert.deepEqual(P.normalizeProgram(undefined,samples,[]).map(x=>x.sample),['a','b','c']);}
+console.log('Program test passed');

@@ -25,7 +25,7 @@ export async function POST(r:Request){try{
  if(!sameOrigin(r))return reply({error:'Ogiltig begäran.'},403);
  const me=await requireMember(r,env),user=me.id;const b:any=await r.json();let id=b.id;
  if(b.action==='create'){
- id=crypto.randomUUID();const plan={theme:'',notes:'',time:'',endTime:'',location:'',budget:null,expected:[],participants:[user],samples:[],snacks:[],snackReceipt:{total:null,note:''}};
+ id=crypto.randomUUID();const plan={theme:'',notes:'',time:'',endTime:'',location:'',budget:null,expected:[],participants:[user],samples:[],snacks:[],snackReceipt:{total:null,note:''},program:[]};
  await db().prepare('INSERT INTO tastings(id,owner,status,title,date,data,token,version) VALUES(?,?,?,?,?,?,?,1)').bind(id,user,'draft',String(b.title||'Ny provning').slice(0,150),'',JSON.stringify(plan),crypto.randomUUID()+crypto.randomUUID()).run();return reply(await detail(id,user));}
  const s:any=await db().prepare('SELECT * FROM tastings WHERE id=?').bind(id).first();if(!s)throw Error('Provningen finns inte.');
  // Test tastings and real tastings never share people.

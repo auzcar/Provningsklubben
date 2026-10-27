@@ -1,10 +1,11 @@
 import {guessSection,isSection} from '@/lib/snacks';
+import {normalizeProgram,type ProgramItem} from '@/lib/program';
 export type Sample={id:string;name:string;article:string;type:string;price:number|null;volume:number|null;abv:number|null;number:number;purchased:boolean;serving:string;image?:string;taste?:string;country?:string;vintage?:string;source?:string;fetchedAt?:string;producer?:string;aroma?:string;color?:string;grapes?:string;sugar?:number|null;productUrl?:string};
 // Snacks for the evening: a grocery list grouped by store section (lib/snacks.ts). Their cost is
 // not split automatically; the host may note the receipt total so it is not lost.
 export type Snack={id:string;name:string;amount:string;section:string;purchased:boolean};
 export type SnackReceipt={total:number|null;note:string};
-export type Plan={theme:string;notes:string;time:string;endTime:string;location:string;budget:number|null;expected:string[];participants:string[];samples:Sample[];snacks:Snack[];snackReceipt:SnackReceipt};
+export type Plan={theme:string;notes:string;time:string;endTime:string;location:string;budget:number|null;expected:string[];participants:string[];samples:Sample[];snacks:Snack[];snackReceipt:SnackReceipt;program:ProgramItem[]};
 export type Vote={score:number|null;skip:boolean;comment:string;tags?:string[];guess?:number|null};
 // Quick tasting words shown as chips in tasting mode; counted at the reveal.
 export const TASTE_TAGS=['Fruktig','Rökig','Söt','Torr','Kryddig','Syrlig','Bitter','Blommig','Nötig','Ekig','Citrus','Mjuk'];
@@ -16,7 +17,7 @@ export function validatePlan(p:any):Plan{
  if(new Set(samples.map((s:Sample)=>s.id)).size!==samples.length||samples.some((s:Sample)=>!s.id||!s.name.trim()))throw Error('Varje dryck behöver ett namn och ett unikt id.');
   const {snacks,snackReceipt}=validateSnacks(p);
  const clock=(x:any)=>{const v=text(x,5).trim();if(v&&!/^([01]\d|2[0-3]):[0-5]\d$/.test(v))throw Error('Ange tiden som tt:mm, till exempel 19:00.');return v;};
- return {theme:text(p.theme,100),notes:text(p.notes,5000),time:clock(p.time),endTime:clock(p.endTime),location:text(p.location,200).trim(),budget:num(p.budget,100000),expected:Array.isArray(p.expected)?p.expected.map((x:any)=>text(x,60).trim()).filter(Boolean).slice(0,40):[],participants:Array.isArray(p.participants)?[...new Set<string>(p.participants.map((x:any)=>text(x,200)).filter(Boolean))].slice(0,40):[],samples,snacks,snackReceipt};
+ return {theme:text(p.theme,100),notes:text(p.notes,5000),time:clock(p.time),endTime:clock(p.endTime),location:text(p.location,200).trim(),budget:num(p.budget,100000),expected:Array.isArray(p.expected)?p.expected.map((x:any)=>text(x,60).trim()).filter(Boolean).slice(0,40):[],participants:Array.isArray(p.participants)?[...new Set<string>(p.participants.map((x:any)=>text(x,200)).filter(Boolean))].slice(0,40):[],samples,snacks,snackReceipt,program:normalizeProgram(p.program,samples,snacks.map(x=>x.id))};
 }
 // Swish numbers: private mobile (07…) or business (123…), stored as plain digits.
 export function normalizeSwish(input:any){
