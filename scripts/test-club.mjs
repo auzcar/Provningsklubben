@@ -194,3 +194,43 @@ console.log('Host and simulation tests passed');
  assert.equal(await status('late'),423);assert.ok((await get('late',null)).sessions.find(x=>x.id===tid).revealing);
  await post('host',{action:'reveal-all',id:tid});assert.equal(await status('late'),200);assert.ok(!(await get('late',null)).sessions.find(x=>x.id===tid).revealing);}
 console.log('Step test passed');
+// Bottles to take home: favourite first; clashes by love above own average, then loss, then a draw.
+{const {allocate}=await import('../.sites-runtime/tests/lib/allocation.mjs');
+ const P=[{user:'a',name:'A'},{user:'b',name:'B'},{user:'c',name:'C'}],S=[{id:'x'},{id:'y'},{id:'z'}];
+ const r=(u,x,y,z)=>[['x',x],['y',y],['z',z]].map(([s,v])=>({user:u,sample:s,score:v}));
+ // Everyone loves x. A gives 9 but rates everything high; B gives 8 against a low average and wins it.
+ let out=allocate(P,S,[...r('a',9,8.5,8.5),...r('b',8,4,5),...r('c',7,6,3)]);
+ const got=u=>out.items.find(i=>i.user===u).sample;
+ // Then A and C both want y; C rated it above their average, A below, so A gets z.
+ assert.deepEqual([got('a'),got('b'),got('c')],['z','x','y']);
+ assert.equal(out.items.find(i=>i.user==='b').contest.rule,'love');assert.deepEqual(out.leftoverSamples,[]);assert.deepEqual(out.leftoverPeople,[]);
+ // Same love: the one who would lose most by settling for the next bottle wins.
+ // Both rate x 1 point above their average 7; A's next best is 7, B's 7.5, so A loses more.
+ out=allocate(P.slice(0,2),S,[...r('a',8,6,7),...r('b',8,7.5,5.5)]);
+ assert.equal(out.items.find(i=>i.sample==='x').user,'a');assert.equal(out.items.find(i=>i.sample==='x').contest.rule,'loss');
+ // Identical ratings: a draw, and "avstår" counts as the lowest.
+ const same=[{user:'a',sample:'x',score:7},{user:'a',sample:'y',score:null},{user:'b',sample:'x',score:7},{user:'b',sample:'y',score:null}];
+ assert.equal(allocate(P.slice(0,2),S.slice(0,2),same,()=>0).items.find(i=>i.sample==='x').contest.rule,'draw');
+ assert.equal(allocate(P.slice(0,2),S.slice(0,2),same,()=>0).items.find(i=>i.sample==='x').user,'a');
+ assert.equal(allocate(P.slice(0,2),S.slice(0,2),same,()=>0.99).items.find(i=>i.sample==='x').user,'b');
+ // Uneven numbers: leftovers are listed, nobody gets two.
+ out=allocate(P,S.slice(0,2),[...r('a',9,1,0),...r('b',8,2,0),...r('c',1,9,0)]);assert.deepEqual(out.leftoverPeople,['b']);
+ out=allocate(P.slice(0,1),S,r('a',1,9,2));assert.equal(out.items[0].sample,'y');assert.deepEqual(out.leftoverSamples.sort(),['x','z']);
+ // Through the API: only the host, only after the full reveal, shown one person at a time.
+ let t=await post('host',{action:'create',title:'Flaskor'});const tid=t.id;
+ t=await post('host',{action:'save',id:tid,version:t.version,title:'Flaskor',date:'',plan:{...t.plan,participants:['host','guest'],samples:[{id:'f1',name:'Rom A'},{id:'f2',name:'Rom B'}]}});
+ t=await post('host',{action:'start',id:tid});
+ for(const [n,sid] of [[0,'f1'],[1,'f2']]){await post('host',{action:'next',id:tid});await post('host',{action:'vote',id:tid,sample:sid,vote:{score:sid==='f1'?9:5}});await post('guest',{action:'vote',id:tid,sample:sid,vote:{score:sid==='f1'?6:8}});}
+ await post('host',{action:'allocate',id:tid},false);
+ t=await post('host',{action:'reveal',id:tid});await post('host',{action:'allocate',id:tid},false);
+ await post('host',{action:'reveal-all',id:tid});
+ await post('guest',{action:'allocate',id:tid},false);
+ t=await post('host',{action:'allocate',id:tid});assert.equal(t.allocation.total,2);assert.equal(t.allocation.items.length,2);
+ let g=await get('guest',tid);assert.equal(g.allocation.items.length,0);assert.equal(g.allocation.done,false);
+ await post('guest',{action:'allocate-next',id:tid},false);
+ await post('host',{action:'allocate-next',id:tid});g=await get('guest',tid);assert.equal(g.allocation.items.length,1);
+ t=await post('host',{action:'allocate-all',id:tid});g=await get('guest',tid);assert.equal(g.allocation.done,true);
+ assert.equal(g.allocation.items.find(i=>i.user==='host').sample,'f1');assert.equal(g.allocation.items.find(i=>i.user==='guest').sample,'f2');
+ // The host can swap afterwards.
+ t=await post('host',{action:'allocate-set',id:tid,user:'host',sample:'f2'});assert.equal(t.allocation.items.find(i=>i.user==='guest').sample,'f1');assert.ok(t.allocation.items.every(i=>i.manual));}
+console.log('Allocation test passed');

@@ -353,3 +353,13 @@ button.tm-guest{border:0;background:transparent;color:inherit;padding:0;font:inh
 .tm-fix-row{display:grid;grid-template-columns:minmax(0,1fr) 70px auto auto;gap:8px;align-items:center;padding:10px 0;border-top:1px solid var(--line)}.tm-fix-row small{color:var(--muted)}.tm-fix-row input[inputmode]{min-height:38px;padding:6px 8px;text-align:center}
 .reveal-show.following{cursor:default}
 @media (max-width:420px){.tm-fix-row{grid-template-columns:minmax(0,1fr) 60px auto;}.tm-fix-row .secondary{grid-column:1/-1}}
+/* Who takes which bottle home (app/bottle-share.tsx) */
+.bottle-share{margin-top:34px;padding-top:26px;border-top:1px solid var(--line)}.bottle-share h2{margin:8px 0 12px}.bottle-share>p{max-width:640px;margin-bottom:14px}
+.share-list,.share-latest{display:grid;gap:10px;margin:14px 0}
+.share-row{display:grid;grid-template-columns:44px minmax(0,1fr) auto;gap:12px;align-items:center;background:var(--label);color:#2a1a17;border:1px solid var(--label-line);border-radius:6px;padding:10px 12px}
+.share-row>img{width:36px;height:64px;object-fit:contain}.share-row>svg{justify-self:center;color:#7a1f2c}
+.share-row>div{display:grid;gap:2px;min-width:0}.share-row strong{font-size:16px}.share-row span{font-size:14px}.share-row small{font-size:12px;color:#5f4a39;display:flex;gap:4px;align-items:flex-start}.share-row small svg{flex-shrink:0;margin-top:2px}
+.share-row select{width:auto;max-width:180px;min-height:34px;padding:4px 6px;font-size:12px}
+.share-latest .share-row{animation:pop .5s ease-out;border-width:2px}.share-wait{font-size:16px;margin:12px 0}
+@keyframes pop{from{transform:scale(.96);opacity:0}to{transform:none;opacity:1}}
+@media (max-width:560px){.share-row{grid-template-columns:36px minmax(0,1fr)}.share-row select{grid-column:1/-1;max-width:none}}

@@ -3,8 +3,14 @@ import {validatePlan,validateSnacks,validateVote,costShare,revealDone,revealOrde
 import {requireMember,requireAdmin,reply,fail,sameOrigin,runningTastings,AuthError,LOCKED} from '@/lib/auth';
 import {isTestUser,TEST_USERS} from '@/lib/test-users';
 import {stageOf,publicStage} from '@/lib/program';
+import {allocate} from '@/lib/allocation';
 export const dynamic='force-dynamic';
 const db=()=>{if(!env.DB)throw Error('Databasen är inte tillgänglig.');return env.DB;};
+// Bottles to take home (lib/allocation.ts), shown one person at a time by the host like the reveal.
+function allocationView(plan:any,host:boolean){
+ const a=plan.allocation;if(!a)return undefined;const at=Math.min(Number(a.at)||0,a.items.length);const done=at>=a.items.length;
+ return {at,total:a.items.length,done,items:host||done?a.items:a.items.slice(0,at),leftoverSamples:done||host?a.leftoverSamples:[],leftoverPeople:done||host?a.leftoverPeople:[]};
+}
 async function detail(id:string,user:string){
  const s:any=await db().prepare('SELECT * FROM tastings WHERE id=?').bind(id).first();if(!s)throw Error('Provningen finns inte.');
  const host=s.owner===user;const member=await db().prepare('SELECT * FROM members WHERE session=? AND user=?').bind(id,user).first();// Any member may open a revealed tasting through its link: the results are in the archive anyway.
@@ -29,7 +35,7 @@ async function detail(id:string,user:string){
  if(s.status==='active'&&stage.sample!=null){const sid=plan.samples[stage.sample].id;const w=(people as any[]).filter(p=>!all0(p.user,sid));waiting=w.map(p=>p.name);waitingUsers=w.map(p=>p.user);}
  // Participants pay the host by Swish; the host sees who has marked themselves as paid.
  const pay=member&&!host&&owner?.swish?{to:owner.name,swish:owner.swish,amount:cost.perPerson&&cost.perPerson>0?cost.perPerson:null,paid:!!(member as any).paid}:undefined;
- return {id:s.id,title:s.title,date:s.date,status:s.status,version:s.version,host,self:user,joined:!!member,cost,pay,stage,waiting,waitingUsers,reveal,ratings:ratingsForHost,hostSwish:host?owner?.swish||'':undefined,token:host?s.token:undefined,plan:host?plan:{theme:plan.theme,time:plan.time||'',endTime:plan.endTime||'',location:plan.location||'',participants:plan.participants||[],served:plan.served??null,samples:plan.samples.map((x:any)=>s.status==='revealed'&&shown.has(x.id)?x:{id:x.id,number:x.number})},people:host?people:people.map(({paid,...p}:any)=>p),progress,mine:Object.fromEntries(mine.map((v:any)=>[v.sample,JSON.parse(v.data)])),results:all.map((v:any)=>({...JSON.parse(v.data),sample:v.sample,name:v.name}))};
+ return {id:s.id,title:s.title,date:s.date,status:s.status,version:s.version,host,self:user,joined:!!member,cost,pay,stage,waiting,waitingUsers,reveal,ratings:ratingsForHost,allocation:allocationView(plan,host),hostSwish:host?owner?.swish||'':undefined,token:host?s.token:undefined,plan:host?plan:{theme:plan.theme,time:plan.time||'',endTime:plan.endTime||'',location:plan.location||'',participants:plan.participants||[],served:plan.served??null,samples:plan.samples.map((x:any)=>s.status==='revealed'&&shown.has(x.id)?x:{id:x.id,number:x.number})},people:host?people:people.map(({paid,...p}:any)=>p),progress,mine:Object.fromEntries(mine.map((v:any)=>[v.sample,JSON.parse(v.data)])),results:all.map((v:any)=>({...JSON.parse(v.data),sample:v.sample,name:v.name}))};
 }
 // During a running tasting only that tasting answers (lib/auth.ts); the list stays so the app can find it.
 async function onlyRunning(user:string,id:any){const running=await runningTastings(db(),user);if(running.length&&!running.includes(String(id||'')))throw new AuthError(LOCKED,423);}
@@ -109,6 +115,32 @@ export async function POST(r:Request){try{
  const len=plan.revealOrder.length,at=Number(plan.revealAt)||0,to=b.action==='reveal-all'?len+1:at+1;
  const out=await db().prepare("UPDATE tastings SET data=json_set(data,'$.revealAt',?) WHERE id=? AND status='revealed' AND coalesce(json_extract(data,'$.revealAt'),0)=?").bind(to,id,at).run();
  if(!out.meta.changes)throw Error('Någon annan hann före. Försök igen.');
+ }else if(b.action==='allocate'||b.action==='allocate-next'||b.action==='allocate-all'||b.action==='allocate-set'){
+ // After the reveal the host shares out the bottles: everyone gets their favourite if they can,
+ // clashes are settled by the rules in lib/allocation.ts. The host may adjust afterwards (a swap).
+ if(s.status!=='revealed'||!revealDone(plan))throw Error('Flaskorna fördelas efter avslöjandet.');
+ let a=plan.allocation;
+ if(b.action==='allocate'){
+  const people=((await db().prepare('SELECT user,name FROM members WHERE session=? ORDER BY rowid').bind(id).all()).results as any[]);
+  const ratings=((await db().prepare('SELECT user,sample,data FROM ratings WHERE session=?').bind(id).all()).results as any[]).map(r=>({user:r.user,sample:r.sample,score:JSON.parse(r.data).score??null}));
+  const rnd=()=>{const b=new Uint32Array(1);crypto.getRandomValues(b);return b[0]/2**32;};
+  a={...allocate(people,plan.samples,ratings,rnd),at:0,created:new Date().toISOString()};
+ }else{
+  if(!a)throw Error('Fördela flaskorna först.');
+  if(b.action==='allocate-next')a={...a,at:Math.min((a.at||0)+1,a.items.length)};
+  else if(b.action==='allocate-all')a={...a,at:a.items.length};
+  else{
+   const user=String(b.user||''),sample=String(b.sample||'');
+   if(!plan.samples.some((x:any)=>x.id===sample))throw Error('Okänd flaska.');
+   const mine=a.items.find((i:any)=>i.user===user);const holder=a.items.find((i:any)=>i.sample===sample);
+   if(!mine&&!a.leftoverPeople.includes(user))throw Error('Personen är inte med i fördelningen.');
+   if(mine&&holder&&holder!==mine){holder.sample=mine.sample;holder.manual=true;mine.sample=sample;mine.manual=true;}
+   else if(mine&&!holder){a.leftoverSamples=[...a.leftoverSamples.filter((x:string)=>x!==sample),mine.sample];mine.sample=sample;mine.manual=true;}
+   else if(!mine&&!holder){a.items.push({user,sample,round:0,choice:0,contest:null,manual:true});a.leftoverPeople=a.leftoverPeople.filter((x:string)=>x!==user);a.leftoverSamples=a.leftoverSamples.filter((x:string)=>x!==sample);a.at=a.items.length;}
+   else if(!mine&&holder){a.leftoverPeople=[...a.leftoverPeople.filter((x:string)=>x!==user),holder.user];holder.user=user;holder.manual=true;}
+  }
+ }
+ await db().prepare("UPDATE tastings SET data=json_set(data,'$.allocation',json(?)) WHERE id=? AND status='revealed'").bind(JSON.stringify(a),id).run();
  }else if(b.action==='rate-for'){
  // The host corrects a participant's rating (a slip of the finger, or a second thought) on any drink
  // that has been served, as long as the tasting is on. Only the host can do this.
