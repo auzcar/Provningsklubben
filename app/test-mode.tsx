@@ -16,7 +16,7 @@ export function TestBar({current,onFill}:{current:any;onFill:()=>void}){
   <FlaskConical size={16}/><b>Testläge</b><span className="test-bar-label">Du ser appen som</span>
   <select aria-label="Testperson" value={id||''} onChange={e=>switchTo(e.target.value)}>{TEST_USERS.map(u=><option key={u.id} value={u.id}>{u.name}{u.id==='test:host'?' (värd)':''}</option>)}</select>
   <span className="test-bar-tabs">Öppna i ny flik: {TEST_USERS.filter(u=>u.id!==id).map(u=><button key={u.id} className="text-button" onClick={()=>openTab(u.id)}>{u.name.split(' ')[0]}<ExternalLink size={12}/></button>)}</span>
-  {current?.host&&current.status==='active'&&<button className="text-button" onClick={onFill}><Dice5 size={14}/>Slumpa betyg åt alla</button>}
+  {current?.host&&current.status==='active'&&<button className="text-button" onClick={onFill}><Dice5 size={14}/>Slumpa betyg på provet åt de andra</button>}
   <button className="text-button test-bar-reset" onClick={reset}><Trash2 size={14}/>Rensa testdata</button>
   <button className="text-button" onClick={()=>switchTo(null)}><X size={14}/>Avsluta</button>
  </div>;

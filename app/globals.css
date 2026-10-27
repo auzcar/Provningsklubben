@@ -330,3 +330,18 @@ body:has(.test-bar){padding-top:40px}body:has(.test-bar) .tasting-mode,body:has(
 .tm-run b{font-size:15px}.tm-run b small{font-weight:400;color:var(--muted);font-size:12px}.tm-run p{font-size:13px;color:var(--muted);margin:3px 0 0}.tm-run p.tm-run-secret{color:var(--ink);font-weight:600}
 .tm-run-tag{font-size:11px;letter-spacing:.8px;text-transform:uppercase;background:var(--green);color:var(--label);border-radius:999px;padding:2px 8px;white-space:nowrap}.tm-run-tag.soft{background:transparent;color:var(--green);border:1px solid var(--green)}
 [data-theme=light] .tm-next{border-color:var(--line)}
+/* Tasting mode centred on the table (app/tasting-mode.tsx): locked drinks, read-only earlier ones,
+   the host's step bar and the drink picture while held. */
+.tm-dots button.locked{cursor:not-allowed}.tm-dots button.locked::before{opacity:.35}
+.tm-guest.behind small{color:var(--brass-l)}.tm-guest.behind .tm-ring{animation:pulse 1.6s ease-in-out infinite}
+.tm-secret{grid-template-columns:auto 1fr;align-items:center;gap:4px 14px}.tm-secret>div{display:grid;gap:2px;min-width:0}
+.tm-secret img{width:56px;height:96px;object-fit:contain;background:#fbf6ec;border-radius:3px;padding:3px}
+.tm-latenote{font-size:13px;color:#5f4a39;background:#e9dcc1;border-radius:4px;padding:8px 10px;margin:4px 0 8px}
+.tm-readonly{display:grid;gap:10px;justify-items:start;padding-top:6px}.tm-readonly .tm-kicker{display:inline-flex;align-items:center;gap:5px}
+.tm-readonly .tm-score{text-align:left}.tm-readonly p{margin:0;font-size:14px;color:#5f4a39}.tm-readonly blockquote{margin:0}
+.tm-tags.readonly span{display:inline-block;border:1px solid var(--label-line);border-radius:999px;padding:3px 10px;font-size:13px;margin:0 4px 4px 0}
+.tm-wait{color:var(--brass-l)}.tm-now-icon{width:72px;height:72px;border-radius:50%;display:grid;place-items:center;border:1px solid var(--brass);color:var(--brass-l)}
+.tm-cheers .tm-host-only{max-width:360px;background:#3a161c;border:1px dashed var(--brass);border-radius:6px;padding:8px 12px;color:var(--ink);font-size:14px}
+.tm-step-bar{display:flex;flex-direction:column;align-items:stretch;gap:6px;width:100%}.tm-step-bar small{color:var(--muted);font-size:13px;text-align:center}.tm-step-bar .tm-nav.next{margin-left:0;justify-content:center}
+.tm-foot-note{color:var(--muted);font-size:13px;text-align:center;width:100%;padding:12px 0}
+[data-theme=light] .tm-cheers .tm-host-only{background:#efe3c9}
