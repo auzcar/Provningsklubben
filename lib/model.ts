@@ -1,8 +1,10 @@
+import {guessSection,isSection} from '@/lib/snacks';
 export type Sample={id:string;name:string;article:string;type:string;price:number|null;volume:number|null;abv:number|null;number:number;purchased:boolean;serving:string;image?:string;taste?:string;country?:string;vintage?:string;source?:string;fetchedAt?:string;producer?:string;aroma?:string;color?:string;grapes?:string;sugar?:number|null;productUrl?:string};
-// Snacks and nibbles for the evening, on the host's shopping list next to the bottles.
-export type Snack={id:string;name:string;amount:string;price:number|null;purchased:boolean};
-export type Plan={theme:string;notes:string;budget:number|null;expected:string[];participants:string[];samples:Sample[];snacks:Snack[]};
-export const SNACK_IDEAS=['Chips','Nötter','Ost','Kex','Oliver','Mörk choklad','Charkuterier','Bröd','Vatten'];
+// Snacks for the evening: a grocery list grouped by store section (lib/snacks.ts). Their cost is
+// not split automatically; the host may note the receipt total so it is not lost.
+export type Snack={id:string;name:string;amount:string;section:string;purchased:boolean};
+export type SnackReceipt={total:number|null;note:string};
+export type Plan={theme:string;notes:string;budget:number|null;expected:string[];participants:string[];samples:Sample[];snacks:Snack[];snackReceipt:SnackReceipt};
 export type Vote={score:number|null;skip:boolean;comment:string;tags?:string[];guess?:number|null};
 // Quick tasting words shown as chips in tasting mode; counted at the reveal.
 export const TASTE_TAGS=['Fruktig','Rökig','Söt','Torr','Kryddig','Syrlig','Bitter','Blommig','Nötig','Ekig','Citrus','Mjuk'];
@@ -12,9 +14,8 @@ export function validatePlan(p:any):Plan{
  const num=(x:any,max:number)=>{if(x==null||x==='')return null;const n=Number(x);if(!Number.isFinite(n)||n<0||n>max)throw Error('Kontrollera sifferfälten.');return n;};
  const samples=p.samples.map((s:any,i:number)=>({...s,id:text(s.id,80),name:text(s.name,200),article:text(s.article,20),type:text(s.type,200),price:num(s.price,100000),volume:num(s.volume,50000),abv:num(s.abv,100),number:i+1,purchased:!!s.purchased,serving:text(s.serving),image:/^https:\/\/product-cdn.systembolaget.se\//.test(s.image||'')?s.image:'',taste:text(s.taste),country:text(s.country,100),vintage:text(s.vintage,50),source:text(s.source,200),fetchedAt:text(s.fetchedAt,80)}));
  if(new Set(samples.map((s:Sample)=>s.id)).size!==samples.length||samples.some((s:Sample)=>!s.id||!s.name.trim()))throw Error('Varje dryck behöver ett namn och ett unikt id.');
-  if(Array.isArray(p.snacks)&&p.snacks.length>60)throw Error('Högst 60 tilltugg per provning.');
- const snacks=(Array.isArray(p.snacks)?p.snacks:[]).map((x:any)=>({id:text(x?.id,80),name:text(x?.name,120).trim(),amount:text(x?.amount,60).trim(),price:num(x?.price,100000),purchased:!!x?.purchased})).filter((x:Snack)=>x.id&&x.name);
- return {theme:text(p.theme,100),notes:text(p.notes,5000),budget:num(p.budget,100000),expected:Array.isArray(p.expected)?p.expected.map((x:any)=>text(x,60).trim()).filter(Boolean).slice(0,40):[],participants:Array.isArray(p.participants)?[...new Set<string>(p.participants.map((x:any)=>text(x,200)).filter(Boolean))].slice(0,40):[],samples,snacks};
+  const {snacks,snackReceipt}=validateSnacks(p);
+ return {theme:text(p.theme,100),notes:text(p.notes,5000),budget:num(p.budget,100000),expected:Array.isArray(p.expected)?p.expected.map((x:any)=>text(x,60).trim()).filter(Boolean).slice(0,40):[],participants:Array.isArray(p.participants)?[...new Set<string>(p.participants.map((x:any)=>text(x,200)).filter(Boolean))].slice(0,40):[],samples,snacks,snackReceipt};
 }
 // Swish numbers: private mobile (07…) or business (123…), stored as plain digits.
 export function normalizeSwish(input:any){
@@ -28,8 +29,17 @@ export function swishLink(number:string,amount:number|null,message:string){
  const data={version:1,payee:{value:number},...(amount?{amount:{value:amount}}:{}),message:{value:message.slice(0,50),editable:true}};
  return 'swish://payment?data='+encodeURIComponent(JSON.stringify(data));
 }
-// Even split of the known bottle and snack prices, rounded up to whole kronor.
-export function costShare(samples:Sample[],people:number,snacks:Snack[]=[]){const total=[...samples,...snacks].reduce((n,s)=>n+(Number(s.price)||0),0);return {total,people,perPerson:people>0?Math.ceil(total/people):null};
+export function validateSnacks(p:any):{snacks:Snack[];snackReceipt:SnackReceipt}{
+ const text=(x:any,n:number)=>String(x??'').slice(0,n).trim();
+ if(Array.isArray(p?.snacks)&&p.snacks.length>80)throw Error('Högst 80 tilltugg per provning.');
+ const snacks=(Array.isArray(p?.snacks)?p.snacks:[]).map((x:any)=>{const name=text(x?.name,120);return {id:text(x?.id,80),name,amount:text(x?.amount,60),section:isSection(x?.section)?x.section:guessSection(name),purchased:!!x?.purchased};}).filter((x:Snack)=>x.id&&x.name);
+ if(new Set(snacks.map((x:Snack)=>x.id)).size!==snacks.length)throw Error('Varje tilltugg behöver ett unikt id.');
+ const t=p?.snackReceipt?.total;const total=t==null||t===''?null:Number(t);
+ if(total!==null&&(!Number.isFinite(total)||total<0||total>100000))throw Error('Ange kvittosumman i kronor.');
+ return {snacks,snackReceipt:{total:total===null?null:Math.round(total*100)/100,note:text(p?.snackReceipt?.note,300)}};
+}
+// Even split of the known bottle prices, rounded up to whole kronor.
+export function costShare(samples:Sample[],people:number){const total=samples.reduce((n,s)=>n+(Number(s.price)||0),0);return {total,people,perPerson:people>0?Math.ceil(total/people):null};
 }
 export function validateVote(v:any):Vote{const score=v?.skip?null:Number(v?.score);if(!v?.skip&&(v?.score==null||v?.score===''||!Number.isFinite(score)||score!<0||score!>10))throw Error('Ange ett betyg mellan 0 och 10.');
  const tags=Array.isArray(v.tags)?[...new Set<string>(v.tags.filter((t:any)=>TASTE_TAGS.includes(t)))]:[];

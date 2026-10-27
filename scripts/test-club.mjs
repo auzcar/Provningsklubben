@@ -38,11 +38,15 @@ const lager=hist.find(s=>s.title.includes('29/10 - 2020'));assert.equal(lager.sa
 const gin=hist.find(s=>s.title.includes('23/1 - 2021'));assert.equal(gin.samples.length,8);assert.deepEqual([...new Set(gin.samples.map(p=>p.serving))],['Rent','G&T']);
 }
 console.log('PASS: authorization, no premature disclosure, draft version conflicts, rating validation, zero/skip, reveal gating, locked results.');
-// Snacks on the host's shopping list: saved with the plan, counted in the cost, hidden from guests.
-{let t=await post('host',{action:'create',title:'Tilltugg'});const tid=t.id;assert.deepEqual(t.plan.snacks,[]);
- t=await post('host',{action:'save',id:tid,version:t.version,title:'Tilltugg',date:'',plan:{...t.plan,samples:[{id:'b1',name:'Öl',price:30}],snacks:[{id:'n1',name:'Chips',amount:'2 påsar',price:40,purchased:true},{id:'n2',name:'Nötter',price:'',purchased:false},{id:'',name:'Utan id'},{id:'n3',name:'   '}]}});
- assert.deepEqual(t.plan.snacks,[{id:'n1',name:'Chips',amount:'2 påsar',price:40,purchased:true},{id:'n2',name:'Nötter',amount:'',price:null,purchased:false}]);
- assert.equal(t.cost.total,70);
- await post('host',{action:'save',id:tid,version:t.version,title:'Tilltugg',date:'',plan:{...t.plan,snacks:[{id:'x',name:'Ost',price:-5}]}},false);
- t=await post('host',{action:'start',id:tid});const g=await post('guest',{action:'join',id:tid,token:t.token,name:'Guest'});assert.equal(g.plan.snacks,undefined);}
+// Snacks: a grocery list grouped by store section, not part of the cost split, editable after opening.
+{let t=await post('host',{action:'create',title:'Tilltugg'});const tid=t.id;assert.deepEqual(t.plan.snacks,[]);assert.deepEqual(t.plan.snackReceipt,{total:null,note:''});
+ t=await post('host',{action:'save',id:tid,version:t.version,title:'Tilltugg',date:'',plan:{...t.plan,samples:[{id:'b1',name:'Öl',price:30}],snacks:[{id:'n1',name:'Chips',amount:'2 påsar',purchased:true},{id:'n2',name:'Lagrad getost',section:'bogus'},{id:'n3',name:'Is',section:'ovrigt'},{id:'',name:'Utan id'},{id:'n4',name:'   '}],snackReceipt:{total:'249.5',note:'ICA'}}});
+ assert.deepEqual(t.plan.snacks.map(x=>[x.id,x.section,x.purchased]),[['n1','snacks',true],['n2','ost',false],['n3','ovrigt',false]]);
+ assert.deepEqual(t.plan.snackReceipt,{total:249.5,note:'ICA'});assert.equal(t.cost.total,30);
+ await post('host',{action:'save',id:tid,version:t.version,title:'Tilltugg',date:'',plan:{...t.plan,snackReceipt:{total:-5}}},false);
+ t=await post('host',{action:'start',id:tid});const v=t.version;
+ const g=await post('guest',{action:'join',id:tid,token:t.token,name:'Guest'});assert.equal(g.plan.snacks,undefined);assert.equal(g.plan.snackReceipt,undefined);
+ await post('guest',{action:'snacks',id:tid,snacks:[]},false);
+ t=await post('host',{action:'snacks',id:tid,snacks:[{id:'n9',name:'Vindruvor'}],snackReceipt:{total:100,note:''}});
+ assert.deepEqual(t.plan.snacks,[{id:'n9',name:'Vindruvor',amount:'',section:'frukt',purchased:false}]);assert.equal(t.plan.snackReceipt.total,100);assert.equal(t.version,v);assert.equal(t.plan.samples[0].name,'Öl');}
 console.log('Snacks test passed');
