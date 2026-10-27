@@ -1,6 +1,7 @@
 import {verifyToken,createClerkClient} from '@clerk/backend';
 import {isTestUser} from '@/lib/test-users';
 import {applyPending} from '@/lib/pending';
+import {eveningOpenSql} from '@/lib/model';
 
 // Server-side identity and club membership. Every API route calls requireMember();
 // the client never decides who it is.
@@ -77,7 +78,7 @@ export async function findMember(r:Request,env:AuthEnv,{ignoreTest=false}={}):Pr
 export const LOCKED='Provningen pågår. Resten av klubben öppnas när resultatet har avslöjats.';
 export async function runningTastings(db:D1Database,user:string){
  const yesterday=new Date(Date.now()-864e5).toLocaleDateString('sv-SE',{timeZone:'Europe/Stockholm'});
- const rows=(await db.prepare("SELECT t.id FROM tastings t WHERE t.status='active' AND (t.date='' OR t.date>=?) AND (t.owner=? OR EXISTS(SELECT 1 FROM members m WHERE m.session=t.id AND m.user=?))").bind(yesterday,user,user).all()).results as any[];
+ const rows=(await db.prepare("SELECT t.id FROM tastings t WHERE (t.status='active' OR (t.status='revealed' AND "+eveningOpenSql('t.data')+")) AND (t.date='' OR t.date>=?) AND (t.owner=? OR EXISTS(SELECT 1 FROM members m WHERE m.session=t.id AND m.user=?))").bind(yesterday,user,user).all()).results as any[];
  return rows.map(x=>String(x.id));
 }
 type Guard={ignoreTest?:boolean;duringTasting?:boolean};
