@@ -316,3 +316,5 @@ body:has(.test-bar){padding-top:40px}body:has(.test-bar) .tasting-mode,body:has(
 .program-edit{background:#00000006;border:1px solid var(--line);border-radius:6px;padding:4px 12px 10px;margin:6px 0 4px}.program-edit .field{margin:10px 0}
 .chip.elsewhere{opacity:.55}.program-add{gap:8px;margin:14px 0 8px}
 @media (max-width:640px){.program-item{grid-template-columns:64px 26px minmax(0,1fr);gap:8px}.program-item:not(:last-child)::after{left:84px}}
+/* Calendar subscription on the profile (app/calendar-subscribe.tsx) */
+.calendar-subscribe>p{max-width:640px;margin:8px 0 16px}.calendar-buttons{gap:8px;margin-bottom:10px}.calendar-subscribe>small{display:block;max-width:640px;margin-bottom:6px}

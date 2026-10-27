@@ -82,3 +82,23 @@ console.log('Time test passed');
  // Older plans without a program get one from the drinks.
  assert.deepEqual(P.normalizeProgram(undefined,samples,[]).map(x=>x.sample),['a','b','c']);}
 console.log('Program test passed');
+// Calendar subscription: a secret per-member feed with the tastings they host, joined or are invited to.
+{const cal=await route('calendar',env);
+ const creq=(user,body,qs='')=>new Request('https://test.local/api/calendar'+qs,{method:body?'POST':'GET',headers:{...(user?{'oai-authenticated-user-id':user}:{}),'Content-Type':'application/json','Origin':'https://test.local'},...(body?{body:JSON.stringify(body)}:{})});
+ const ics=async url=>{const r=await cal.GET(new Request(url));return {status:r.status,type:r.headers.get('content-type'),text:await r.text()};};
+ assert.equal((await cal.GET(creq(null))).status,401);
+ let t=await post('host',{action:'create',title:'Kalenderkväll'});const tid=t.id;
+ t=await post('host',{action:'save',id:tid,version:t.version,title:'Kalenderkväll',date:'2099-03-01',plan:{...t.plan,time:'19:00',location:'Hos Kim',samples:[{id:'q',name:'Hemlig whisky'}],participants:['host','invitee']}});
+ await get('invitee',null);// first sign-in creates the profile
+ const url=(await (await cal.GET(creq('invitee'))).json()).url;assert.match(url,/^https:\/\/test\.local\/api\/calendar\?feed=[0-9a-f]{48}$/);
+ assert.equal((await (await cal.GET(creq('invitee'))).json()).url,url);
+ let f=await ics(url);assert.equal(f.status,200);assert.match(f.type,/text\/calendar/);assert.match(f.text,/SUMMARY:Provningsklubben: Kalenderkväll/);
+ assert.match(f.text,/DTSTART;TZID=Europe\/Stockholm:20990301T190000/);assert.match(f.text,/LOCATION:Hos Kim/);assert.doesNotMatch(f.text,/Hemlig/);
+ // The host moves the evening; the same address now gives the new time.
+ t=await post('host',{action:'save',id:tid,version:t.version,title:'Kalenderkväll',date:'2099-03-02',plan:{...t.plan,time:'18:00'}});
+ f=await ics(url);assert.match(f.text,/DTSTART;TZID=Europe\/Stockholm:20990302T180000/);
+ await get('outsider',null);const other=(await (await cal.GET(creq('outsider'))).json()).url;assert.doesNotMatch((await ics(other)).text,/Kalenderkväll/);
+ assert.equal((await ics('https://test.local/api/calendar?feed='+'0'.repeat(48))).status,404);assert.equal((await ics('https://test.local/api/calendar?feed=x')).status,404);
+ assert.equal((await cal.POST(creq('invitee',{action:'reset'}))).status,200);assert.equal((await ics(url)).status,404);
+ const r=await cal.POST(new Request('https://test.local/api/calendar',{method:'POST',headers:{'oai-authenticated-user-id':'invitee','Origin':'https://evil.example','Content-Type':'application/json'},body:'{"action":"reset"}'}));assert.equal(r.status,403);}
+console.log('Calendar test passed');

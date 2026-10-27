@@ -13,3 +13,6 @@ export const shoppingItems=sqliteTable('shopping_items',{user:text('user').notNu
 // Members the admin has prepared before they first sign in: name, archive names and photo,
 // applied when someone signs in with this verified email (lib/pending.ts).
 export const pendingProfiles=sqliteTable('pending_profiles',{email:text('email').primaryKey(),name:text('name').notNull(),historyNames:text('history_names').notNull().default('[]'),mime:text('mime').notNull().default(''),avatar:text('avatar').notNull().default(''),createdAt:text('created_at').notNull()});
+// Personal calendar subscription: a secret token per member for the feed at /api/calendar?feed=…
+// (calendar apps cannot sign in). Replacing the token stops the old link.
+export const calendarFeeds=sqliteTable('calendar_feeds',{user:text('user').primaryKey(),token:text('token').notNull().unique(),createdAt:text('created_at').notNull()});
