@@ -29,6 +29,7 @@ Under Medlemmar kan en administratör starta testläget. Då skapas fyra påhitt
 - Testprovningar och riktiga provningar delar aldrig deltagare: testpersoner kan inte bjudas in till eller ansluta till riktiga provningar och tvärtom.
 - Testprovningar visas inte i det riktiga arkivet, statistiken eller medlemslistan. Testpersonerna ser bara varandra.
 - Värden i en pågående testprovning kan fylla i slumpbetyg åt testdeltagarna. "Rensa testdata" tar bort testpersoner, testprovningar, deras betyg och profilbilder.
+- Provkör en riktig planering: under Planering → Översikt kan administratören kopiera sin egen provning till en testprovning ("Provkör i testläget"). Kopian får Testvärden som värd och alla testpersoner som inbjudna, och öppnas i samma flik som Testvärden. Originalet påverkas inte, och kopian försvinner med Rensa testdata.
 
 ## Sätta upp Clerk (görs av ägaren)
 

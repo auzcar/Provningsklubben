@@ -102,3 +102,23 @@ console.log('Program test passed');
  assert.equal((await cal.POST(creq('invitee',{action:'reset'}))).status,200);assert.equal((await ics(url)).status,404);
  const r=await cal.POST(new Request('https://test.local/api/calendar',{method:'POST',headers:{'oai-authenticated-user-id':'invitee','Origin':'https://evil.example','Content-Type':'application/json'},body:'{"action":"reset"}'}));assert.equal(r.status,403);}
 console.log('Calendar test passed');
+// The host always takes part and rates, even if left out of the participant list.
+{let t=await post('host',{action:'create',title:'Värd deltar'});const tid=t.id;
+ t=await post('host',{action:'save',id:tid,version:t.version,title:'Värd deltar',date:'',plan:{...t.plan,participants:['guest'],samples:[{id:'v',name:'X'}]}});
+ assert.deepEqual(t.plan.participants,['host','guest']);
+ t=await post('host',{action:'start',id:tid});assert.equal(t.joined,true);assert.deepEqual(t.people.map(p=>p.user).sort(),['guest','host']);}
+// Test mode: an admin copies their own real plan to a test tasting with the test members invited.
+{const adminEnv=env;adminEnv.ADMIN_EMAILS='boss@test.local';
+ const areq=body=>new Request('https://test.local/api/club',{method:'POST',headers:{'oai-authenticated-user-id':'boss','oai-authenticated-user-email':'boss@test.local','Content-Type':'application/json','Origin':'https://test.local'},body:JSON.stringify(body)});
+ const call=async(body,ok=true)=>{const r=await POST(areq(body));const d=await r.json();assert.equal(r.ok,ok,JSON.stringify(d));return d;};
+ let t=await call({action:'create',title:'Första skarpa'});const src=t.id;
+ t=await call({action:'save',id:src,version:t.version,title:'Första skarpa',date:'2026-11-14',plan:{...t.plan,time:'19:00',samples:[{id:'r1',name:'Rom 1'},{id:'r2',name:'Rom 2'}],snacks:[{id:'n',name:'Ost'}],program:[{id:'m',kind:'meal',title:'Middag'}],participants:['boss']}});
+ const sim=await call({action:'simulate',id:src});
+ const greq=(user,id)=>new Request('https://test.local/api/club?id='+id,{headers:{'oai-authenticated-user-id':'boss','oai-authenticated-user-email':'boss@test.local','X-Test-User':user}});
+ const copy=await (await GET(greq('test:host',sim.id))).json();
+ assert.equal(copy.title,'Test: Första skarpa');assert.equal(copy.host,true);assert.equal(copy.status,'draft');assert.equal(copy.plan.time,'19:00');
+ assert.deepEqual(copy.plan.samples.map(s=>s.name),['Rom 1','Rom 2']);assert.equal(copy.plan.snacks[0].name,'Ost');assert.deepEqual(copy.plan.participants,['test:host','test:1','test:2','test:3']);
+ const orig=await call({action:'save',id:src,version:t.version,title:'Första skarpa',date:'2026-11-14',plan:t.plan});assert.equal(orig.title,'Första skarpa');
+ await post('host',{action:'simulate',id:src},false);// not an admin
+ const other=await post('host',{action:'create',title:'Någon annans'});await call({action:'simulate',id:other.id},false);}
+console.log('Host and simulation tests passed');

@@ -18,9 +18,9 @@ const PROMPTS=['Vad påminner doften om? Alla säger ett ord samtidigt.','Gissa 
 // Full-screen blind tasting: one glass at a time, autosave, and the table in view.
 // The host scores too; the drink's identity only shows while the reveal button is held.
 // While a tasting is on, everyone is held here (locked): no way out until the reveal, except the
-// host's option to cancel the tasting. A host who does not rate (not joined) gets the host tools only.
+// host's option to cancel the tasting.
 export default function TastingMode({current,onExit,onReveal,canReveal,revealHint,onCopyLink,onRemove,onServe,onPaid,busy,locked=false,onCancel}:{current:any;locked?:boolean;onCancel?:()=>void;onPaid:(paid:boolean)=>void;onExit:()=>void;onReveal:()=>void;canReveal:boolean;revealHint:string;onCopyLink:()=>void;onRemove:(user:string,name:string)=>void;onServe:(index:number)=>void;busy:boolean}){
- const samples=current.plan.samples as any[];const rater=!!current.joined;
+ const samples=current.plan.samples as any[];
  const [index,setIndex]=useState(()=>{const i=samples.findIndex(s=>!current.mine[s.id]);return i<0?samples.length:i;});
  const [votes,setVotes]=useState<Record<string,Draft>>(()=>Object.fromEntries(samples.map(s=>{const v=current.mine[s.id];return [s.id,v?{tags:[],guess:null,...v,state:'saved'}:{score:null,skip:false,comment:'',tags:[],guess:null,state:'empty'}];})));
  const [peek,setPeek]=useState(false);const [panel,setPanel]=useState(false);const [prompt,setPrompt]=useState(0);const [avatars,setAvatars]=useState<Record<string,number>>({});
@@ -90,7 +90,6 @@ export default function TastingMode({current,onExit,onReveal,canReveal,revealHin
 
    <div className="tm-prompt"><MessageCircle size={16}/><p>{PROMPTS[(index*5+prompt)%PROMPTS.length]}</p><button aria-label="Ny samtalsfråga" onClick={()=>setPrompt(p=>p+1)}><RefreshCw size={14}/></button></div>
 
-   {rater?<>
    <div className="tm-score-row">
     <button className="tm-step" aria-label="Sänk 0,1" disabled={vote.skip} onClick={()=>nudge(-0.1)}>−</button>
     <div className="tm-score" aria-live="polite">{vote.skip?<span className="tm-skip">Avstår</span>:<><b>{fmt(vote.score)}</b><small>av tio möjliga</small></>}</div>
@@ -106,20 +105,17 @@ export default function TastingMode({current,onExit,onReveal,canReveal,revealHin
 
    <label className="tm-note"><span className="tm-kicker">Smakanteckning</span><textarea rows={2} value={vote.comment} placeholder="Doft, smak, eftersmak…" onChange={e=>update({comment:e.target.value.slice(0,2000)})}/></label>
    <div className="row between tm-meta"><label className="tm-toggle"><input type="checkbox" checked={vote.skip} onChange={e=>update({skip:e.target.checked})}/>Jag avstår</label><span className={'tm-state is-'+vote.state}>{vote.state==='saved'?<><Check size={13}/>Sparat</>:vote.state==='pending'?'Sparar…':vote.state==='error'?vote.message:'Inte betygsatt'}</span></div>
-   </>:<p className="tm-norate">Du sätter inga betyg i den här provningen. Håll koll på bordet och ställ fram proven i tur och ordning.</p>}
   </div></main>
   :<main className="tm-cheers">
    <div className={'tm-glasses'+(completed===samples.length?' clink':'')} aria-hidden="true">
     <svg viewBox="0 0 64 80" width="64" height="80"><path d="M14 6h36l-3 26a15 15 0 0 1-30 0z" fill="#8c2433" stroke="#d9b46a" strokeWidth="2"/><path d="M32 47v24M20 73h24" stroke="#d9b46a" strokeWidth="2" strokeLinecap="round"/></svg>
     <svg viewBox="0 0 64 80" width="64" height="80"><path d="M14 6h36l-3 26a15 15 0 0 1-30 0z" fill="#c49a4a" stroke="#d9b46a" strokeWidth="2"/><path d="M32 47v24M20 73h24" stroke="#d9b46a" strokeWidth="2" strokeLinecap="round"/></svg>
    </div>
-   {rater?<>
    <h2>{completed===samples.length?'Skål!':'Nästan där'}</h2>
    <p>{completed===samples.length?'Du har betygsatt alla prov. Lägg ifrån dig telefonen och snacka med bordet. Resultatet avslöjas tillsammans.':`Du har betygsatt ${completed} av ${samples.length} prov.`}</p>
    {completed===samples.length&&<div className="tm-prompt dark"><MessageCircle size={16}/><p>Medan ni väntar: vilket prov tror ni vinner, och vem har gett lägst betyg?</p></div>}
    {completed===samples.length&&<SwishPay current={current} onPaid={onPaid} busy={busy}/>}
    {completed<samples.length&&<button className="tm-cta" onClick={()=>go(samples.findIndex(s=>!done(votes[s.id])))}>Till nästa obesvarade</button>}
-   </>:<><h2>Alla prov</h2><p>Avslöja resultatet från värdpanelen när alla vid bordet är klara.</p></>}
    {current.host&&<button className="tm-cta" onClick={()=>setPanel(true)}><Users size={17}/>Värdpanelen</button>}
   </main>}
 
