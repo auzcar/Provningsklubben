@@ -1,5 +1,5 @@
 import {env} from 'cloudflare:workers';
-import {validatePlan,validateVote,visibleSamples,costShare} from '@/lib/model';
+import {validatePlan,validateSnacks,validateVote,visibleSamples,costShare} from '@/lib/model';
 import {requireMember,reply,fail,sameOrigin} from '@/lib/auth';
 import {isTestUser} from '@/lib/test-users';
 export const dynamic='force-dynamic';
@@ -15,17 +15,17 @@ async function detail(id:string,user:string){
  const all=s.status==='revealed'?(await db().prepare('SELECT r.sample,r.data,m.name FROM ratings r JOIN members m ON r.session=m.session AND r.user=m.user WHERE r.session=?').bind(id).all()).results:[];
  const headcount=s.status==='draft'?(plan.participants||[]).length:people.length;
  const owner:any=await db().prepare('SELECT name,swish FROM profiles WHERE user=?').bind(s.owner).first();
- const cost=costShare(plan.samples,headcount,plan.snacks||[]);
+ const cost=costShare(plan.samples,headcount);
  // Participants pay the host by Swish; the host sees who has marked themselves as paid.
  const pay=member&&!host&&owner?.swish?{to:owner.name,swish:owner.swish,amount:cost.perPerson&&cost.perPerson>0?cost.perPerson:null,paid:!!(member as any).paid}:undefined;
- return {id:s.id,title:s.title,date:s.date,status:s.status,version:s.version,host,self:user,joined:!!member,cost,pay,hostSwish:host?owner?.swish||'':undefined,token:host?s.token:undefined,plan:host?plan:{theme:plan.theme,participants:plan.participants||[],served:plan.served??null,samples:visibleSamples(plan.samples,false,s.status==='revealed')},people:host?people:people.map(({paid,...p}:any)=>p),progress,mine:Object.fromEntries(mine.map((v:any)=>[v.sample,JSON.parse(v.data)])),results:all.map((v:any)=>({...JSON.parse(v.data),sample:v.sample,name:v.name}))};
+ return {id:s.id,title:s.title,date:s.date,status:s.status,version:s.version,host,self:user,joined:!!member,cost,pay,hostSwish:host?owner?.swish||'':undefined,token:host?s.token:undefined,plan:host?plan:{theme:plan.theme,time:plan.time||'',endTime:plan.endTime||'',location:plan.location||'',participants:plan.participants||[],served:plan.served??null,samples:visibleSamples(plan.samples,false,s.status==='revealed')},people:host?people:people.map(({paid,...p}:any)=>p),progress,mine:Object.fromEntries(mine.map((v:any)=>[v.sample,JSON.parse(v.data)])),results:all.map((v:any)=>({...JSON.parse(v.data),sample:v.sample,name:v.name}))};
 }
-export async function GET(r:Request){try{const me=await requireMember(r,env),user=me.id;const id=new URL(r.url).searchParams.get('id');if(id)return reply(await detail(id,user));const rows=(await db().prepare('SELECT DISTINCT t.id,t.title,t.date,t.status,t.owner FROM tastings t LEFT JOIN members m ON t.id=m.session WHERE t.owner=? OR m.user=? ORDER BY t.date DESC').bind(user,user).all()).results;return reply({user,sessions:rows.map((s:any)=>({...s,host:s.owner===user,owner:undefined}))});}catch(e:any){return fail(e)}}
+export async function GET(r:Request){try{const me=await requireMember(r,env),user=me.id;const id=new URL(r.url).searchParams.get('id');if(id)return reply(await detail(id,user));const rows=(await db().prepare("SELECT DISTINCT t.id,t.title,t.date,json_extract(t.data,'$.time') time,t.status,t.owner FROM tastings t LEFT JOIN members m ON t.id=m.session WHERE t.owner=? OR m.user=? ORDER BY t.date DESC").bind(user,user).all()).results;return reply({user,sessions:rows.map((s:any)=>({...s,host:s.owner===user,owner:undefined}))});}catch(e:any){return fail(e)}}
 export async function POST(r:Request){try{
  if(!sameOrigin(r))return reply({error:'Ogiltig begäran.'},403);
  const me=await requireMember(r,env),user=me.id;const b:any=await r.json();let id=b.id;
  if(b.action==='create'){
- id=crypto.randomUUID();const plan={theme:'',notes:'',budget:null,expected:[],participants:[user],samples:[],snacks:[]};
+ id=crypto.randomUUID();const plan={theme:'',notes:'',time:'',endTime:'',location:'',budget:null,expected:[],participants:[user],samples:[],snacks:[],snackReceipt:{total:null,note:''},program:[]};
  await db().prepare('INSERT INTO tastings(id,owner,status,title,date,data,token,version) VALUES(?,?,?,?,?,?,?,1)').bind(id,user,'draft',String(b.title||'Ny provning').slice(0,150),'',JSON.stringify(plan),crypto.randomUUID()+crypto.randomUUID()).run();return reply(await detail(id,user));}
  const s:any=await db().prepare('SELECT * FROM tastings WHERE id=?').bind(id).first();if(!s)throw Error('Provningen finns inte.');
  // Test tastings and real tastings never share people.
@@ -64,7 +64,12 @@ export async function POST(r:Request){try{
  if(s.status!=='active')throw Error('Provningen är inte pågående.');
  const memberCount:any=await db().prepare('SELECT COUNT(*) as n FROM members WHERE session=?').bind(id).first();if(memberCount.n<plan.expected.length)throw Error('Alla planerade deltagare har inte anslutit ännu.');
  const out=await db().prepare("UPDATE tastings SET status='revealed',version=version+1 WHERE id=? AND status='active' AND EXISTS(SELECT 1 FROM members WHERE session=?) AND NOT EXISTS(SELECT 1 FROM members m WHERE m.session=? AND (SELECT COUNT(*) FROM ratings r WHERE r.session=m.session AND r.user=m.user) < ?)").bind(id,id,id,plan.samples.length).run();if(!out.meta.changes)throw Error('Alla anslutna deltagare måste betygsätta eller avstå på samtliga prov först.');
-  }else if(b.action==='serve'){
+  }else if(b.action==='snacks'){
+ // The snack list is a grocery list: the host keeps ticking items and noting the receipt after the
+ // tasting has opened, so it is saved on its own, outside the locked plan and its version.
+ const {snacks,snackReceipt}=validateSnacks(b);
+ await db().prepare("UPDATE tastings SET data=json_set(data,'$.snacks',json(?),'$.snackReceipt',json(?)) WHERE id=?").bind(JSON.stringify(snacks),JSON.stringify(snackReceipt),id).run();
+ }else if(b.action==='serve'){
  // The host puts a glass on the table; everyone's tasting mode offers to jump there.
  const n=Number(b.sample);if(s.status!=='active'||!Number.isInteger(n)||n<0||n>=plan.samples.length)throw Error('Ogiltigt prov.');
  await db().prepare("UPDATE tastings SET data=json_set(data,'$.served',?) WHERE id=? AND status='active'").bind(n,id).run();

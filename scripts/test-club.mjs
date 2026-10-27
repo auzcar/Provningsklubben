@@ -38,11 +38,67 @@ const lager=hist.find(s=>s.title.includes('29/10 - 2020'));assert.equal(lager.sa
 const gin=hist.find(s=>s.title.includes('23/1 - 2021'));assert.equal(gin.samples.length,8);assert.deepEqual([...new Set(gin.samples.map(p=>p.serving))],['Rent','G&T']);
 }
 console.log('PASS: authorization, no premature disclosure, draft version conflicts, rating validation, zero/skip, reveal gating, locked results.');
-// Snacks on the host's shopping list: saved with the plan, counted in the cost, hidden from guests.
-{let t=await post('host',{action:'create',title:'Tilltugg'});const tid=t.id;assert.deepEqual(t.plan.snacks,[]);
- t=await post('host',{action:'save',id:tid,version:t.version,title:'Tilltugg',date:'',plan:{...t.plan,samples:[{id:'b1',name:'Öl',price:30}],snacks:[{id:'n1',name:'Chips',amount:'2 påsar',price:40,purchased:true},{id:'n2',name:'Nötter',price:'',purchased:false},{id:'',name:'Utan id'},{id:'n3',name:'   '}]}});
- assert.deepEqual(t.plan.snacks,[{id:'n1',name:'Chips',amount:'2 påsar',price:40,purchased:true},{id:'n2',name:'Nötter',amount:'',price:null,purchased:false}]);
- assert.equal(t.cost.total,70);
- await post('host',{action:'save',id:tid,version:t.version,title:'Tilltugg',date:'',plan:{...t.plan,snacks:[{id:'x',name:'Ost',price:-5}]}},false);
- t=await post('host',{action:'start',id:tid});const g=await post('guest',{action:'join',id:tid,token:t.token,name:'Guest'});assert.equal(g.plan.snacks,undefined);}
+// Snacks: a grocery list grouped by store section, not part of the cost split, editable after opening.
+{let t=await post('host',{action:'create',title:'Tilltugg'});const tid=t.id;assert.deepEqual(t.plan.snacks,[]);assert.deepEqual(t.plan.snackReceipt,{total:null,note:''});
+ t=await post('host',{action:'save',id:tid,version:t.version,title:'Tilltugg',date:'',plan:{...t.plan,samples:[{id:'b1',name:'Öl',price:30}],snacks:[{id:'n1',name:'Chips',amount:'2 påsar',purchased:true},{id:'n2',name:'Lagrad getost',section:'bogus'},{id:'n3',name:'Is',section:'ovrigt'},{id:'',name:'Utan id'},{id:'n4',name:'   '}],snackReceipt:{total:'249.5',note:'ICA'}}});
+ assert.deepEqual(t.plan.snacks.map(x=>[x.id,x.section,x.purchased]),[['n1','snacks',true],['n2','ost',false],['n3','ovrigt',false]]);
+ assert.deepEqual(t.plan.snackReceipt,{total:249.5,note:'ICA'});assert.equal(t.cost.total,30);
+ await post('host',{action:'save',id:tid,version:t.version,title:'Tilltugg',date:'',plan:{...t.plan,snackReceipt:{total:-5}}},false);
+ t=await post('host',{action:'start',id:tid});const v=t.version;
+ const g=await post('guest',{action:'join',id:tid,token:t.token,name:'Guest'});assert.equal(g.plan.snacks,undefined);assert.equal(g.plan.snackReceipt,undefined);
+ await post('guest',{action:'snacks',id:tid,snacks:[]},false);
+ t=await post('host',{action:'snacks',id:tid,snacks:[{id:'n9',name:'Vindruvor'}],snackReceipt:{total:100,note:''}});
+ assert.deepEqual(t.plan.snacks,[{id:'n9',name:'Vindruvor',amount:'',section:'frukt',purchased:false}]);assert.equal(t.plan.snackReceipt.total,100);assert.equal(t.version,v);assert.equal(t.plan.samples[0].name,'Öl');}
 console.log('Snacks test passed');
+// Time and place: validated, visible to participants, and written to the calendar file.
+{let t=await post('host',{action:'create',title:'Tid'});const tid=t.id;
+ await post('host',{action:'save',id:tid,version:t.version,title:'Tid',date:'2026-11-14',plan:{...t.plan,time:'7pm'}},false);
+ t=await post('host',{action:'save',id:tid,version:t.version,title:'Tid',date:'2026-11-14',plan:{...t.plan,time:'19:00',endTime:'01:30',location:'Hemma hos Kim',samples:[{id:'z',name:'Rom'}],participants:['host','guest']}});
+ assert.equal(t.plan.time,'19:00');const list=await get('host');assert.equal(list.sessions.find(x=>x.id===tid).time,'19:00');
+ t=await post('host',{action:'start',id:tid});const g=await post('guest',{action:'join',id:tid,token:t.token,name:'Guest'});
+ assert.deepEqual([g.plan.time,g.plan.endTime,g.plan.location],['19:00','01:30','Hemma hos Kim']);
+ const {tastingIcs}=await import('../.sites-runtime/tests/lib/calendar.mjs');
+ const ics=tastingIcs({id:tid,title:'Tid, med komma',date:'2026-11-14',time:'19:00',endTime:'01:30',location:'Hemma hos Kim',version:3},'https://x/');
+ assert.match(ics,/DTSTART;TZID=Europe\/Stockholm:20261114T190000/);assert.match(ics,/DTEND;TZID=Europe\/Stockholm:20261115T013000/);
+ assert.match(ics,/BEGIN:VTIMEZONE/);assert.match(ics,/SEQUENCE:3/);assert.match(ics,/SUMMARY:Provningsklubben: Tid\\, med komma/);
+ const allDay=tastingIcs({id:'a',title:'A',date:'2026-12-31'},'https://x/');assert.match(allDay,/DTSTART;VALUE=DATE:20261231/);assert.match(allDay,/DTEND;VALUE=DATE:20270101/);assert.doesNotMatch(allDay,/VTIMEZONE/);
+ assert.match(tastingIcs({id:'b',title:'B',date:'2026-07-01',time:'23:00'},'u'),/DTEND;TZID=Europe\/Stockholm:20260702T020000/);
+ assert.ok(ics.split('\r\n').every(l=>new TextEncoder().encode(l).length<=75));}
+console.log('Time test passed');
+// The evening program: drinks follow the tasting order, other items stay where they were put.
+{const P=await import('../.sites-runtime/tests/lib/program.mjs');
+ let t=await post('host',{action:'create',title:'Upplägg'});const tid=t.id;
+ const samples=[{id:'a',name:'A'},{id:'b',name:'B'},{id:'c',name:'C'}];
+ t=await post('host',{action:'save',id:tid,version:t.version,title:'Upplägg',date:'',plan:{...t.plan,samples,snacks:[{id:'s1',name:'Ost'}],
+  program:[{id:'w',kind:'other',title:'Välkomstdrink',time:'18:30'},{id:'pa',kind:'drink',sample:'a',notes:'Rumstempererad',snacks:['s1','gone']},{id:'m',kind:'meal',title:'Middag',notes:'Lamm',time:'25:00'},{id:'x',kind:'drink',sample:'zzz'},{id:'pb',kind:'drink',sample:'b'},{id:'pb2',kind:'drink',sample:'b'},{id:'bad',kind:'party'}]}});
+ assert.deepEqual(t.plan.program.map(x=>[x.kind,x.sample||x.title]),[['other','Välkomstdrink'],['drink','a'],['meal','Middag'],['drink','b'],['drink','c']]);
+ assert.deepEqual(t.plan.program[1].snacks,['s1']);assert.equal(t.plan.program[2].time,'');
+ // Reordering the drinks keeps the meal in its place and the notes with their drink.
+ t=await post('host',{action:'save',id:tid,version:t.version,title:'Upplägg',date:'',plan:{...t.plan,samples:[samples[2],samples[0],samples[1]]}});
+ assert.deepEqual(t.plan.program.map(x=>x.sample||x.title),['Välkomstdrink','c','Middag','a','b']);assert.equal(t.plan.program[3].notes,'Rumstempererad');
+ const mv=P.moveItem(t.plan.program,t.plan.samples,3,-1);assert.deepEqual(mv.program.map(x=>x.sample||x.title),['Välkomstdrink','c','a','Middag','b']);assert.deepEqual(mv.samples.map(s=>s.id),['c','a','b']);
+ const sw=P.moveItem(mv.program,mv.samples,1,1);assert.deepEqual(sw.samples.map(s=>s.id),['a','c','b']);
+ assert.deepEqual(P.suggestTimes(t.plan.program,'23:30').map(x=>x.time),['23:30','23:40','23:55','00:55','01:10']);
+ // Older plans without a program get one from the drinks.
+ assert.deepEqual(P.normalizeProgram(undefined,samples,[]).map(x=>x.sample),['a','b','c']);}
+console.log('Program test passed');
+// Calendar subscription: a secret per-member feed with the tastings they host, joined or are invited to.
+{const cal=await route('calendar',env);
+ const creq=(user,body,qs='')=>new Request('https://test.local/api/calendar'+qs,{method:body?'POST':'GET',headers:{...(user?{'oai-authenticated-user-id':user}:{}),'Content-Type':'application/json','Origin':'https://test.local'},...(body?{body:JSON.stringify(body)}:{})});
+ const ics=async url=>{const r=await cal.GET(new Request(url));return {status:r.status,type:r.headers.get('content-type'),text:await r.text()};};
+ assert.equal((await cal.GET(creq(null))).status,401);
+ let t=await post('host',{action:'create',title:'Kalenderkväll'});const tid=t.id;
+ t=await post('host',{action:'save',id:tid,version:t.version,title:'Kalenderkväll',date:'2099-03-01',plan:{...t.plan,time:'19:00',location:'Hos Kim',samples:[{id:'q',name:'Hemlig whisky'}],participants:['host','invitee']}});
+ await get('invitee',null);// first sign-in creates the profile
+ const url=(await (await cal.GET(creq('invitee'))).json()).url;assert.match(url,/^https:\/\/test\.local\/api\/calendar\?feed=[0-9a-f]{48}$/);
+ assert.equal((await (await cal.GET(creq('invitee'))).json()).url,url);
+ let f=await ics(url);assert.equal(f.status,200);assert.match(f.type,/text\/calendar/);assert.match(f.text,/SUMMARY:Provningsklubben: Kalenderkväll/);
+ assert.match(f.text,/DTSTART;TZID=Europe\/Stockholm:20990301T190000/);assert.match(f.text,/LOCATION:Hos Kim/);assert.doesNotMatch(f.text,/Hemlig/);
+ // The host moves the evening; the same address now gives the new time.
+ t=await post('host',{action:'save',id:tid,version:t.version,title:'Kalenderkväll',date:'2099-03-02',plan:{...t.plan,time:'18:00'}});
+ f=await ics(url);assert.match(f.text,/DTSTART;TZID=Europe\/Stockholm:20990302T180000/);
+ await get('outsider',null);const other=(await (await cal.GET(creq('outsider'))).json()).url;assert.doesNotMatch((await ics(other)).text,/Kalenderkväll/);
+ assert.equal((await ics('https://test.local/api/calendar?feed='+'0'.repeat(48))).status,404);assert.equal((await ics('https://test.local/api/calendar?feed=x')).status,404);
+ assert.equal((await cal.POST(creq('invitee',{action:'reset'}))).status,200);assert.equal((await ics(url)).status,404);
+ const r=await cal.POST(new Request('https://test.local/api/calendar',{method:'POST',headers:{'oai-authenticated-user-id':'invitee','Origin':'https://evil.example','Content-Type':'application/json'},body:'{"action":"reset"}'}));assert.equal(r.status,403);}
+console.log('Calendar test passed');

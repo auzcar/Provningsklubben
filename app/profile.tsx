@@ -6,6 +6,7 @@ import {authHeaders} from '@/lib/client-auth';
 import type {Me} from './auth-gate';
 import SbLink from './sb-link';
 import MyRatings from './my-ratings';
+import CalendarSubscribe from './calendar-subscribe';
 
 const fmt=(n:any,d=2)=>n==null?'–':Number(n).toLocaleString('sv-SE',{maximumFractionDigits:d});
 const statusName:any={draft:'Planering',active:'Pågår',revealed:'Avslöjad'};
@@ -53,6 +54,7 @@ export function Profile({user,me,openTasting,onSaved}:{user:string;me:Me;openTas
    </div>
   </section>
   <section className="stats"><div><span className="stat-number">{data.stats.tastings}</span><p>provningar</p></div><div><span className="stat-number">{data.stats.ratings}</span><p>betygsatta drycker</p></div><div><span className="stat-number">{fmt(data.stats.average,1)}</span><p>snittbetyg</p></div></section>
+  {p.own&&!me.tester&&<CalendarSubscribe/>}
   {data.upcoming.length>0&&<section className="profile-section"><div className="section-head"><div><div className="eyebrow">PÅ GÅNG</div><h2>Dina kommande provningar</h2></div></div><div className="session-grid">{data.upcoming.map((s:any)=><button className="session-card" key={s.id} onClick={()=>openTasting(s.id)}><span className={'badge '+s.status}>{statusName[s.status]}</span><h3>{s.title}</h3><p><CalendarDays size={15}/>{s.date||'Datum inte bestämt'}</p></button>)}</div><p className="muted fine">Betyg från pågående provningar syns först när provningen avslöjas.</p></section>}
   {data.favorites.length>0&&<section className="profile-section"><div className="eyebrow">HÖGST BETYG</div><h2>Favoriter</h2><div className="favorites">{data.favorites.map((f:any,i:number)=><div className="favorite" key={f.id+i}><Star size={15}/><div><strong>{f.name||'Namn saknas'}</strong><small>{f.session}</small></div><span className="rating-pill">{fmt(f.score)}</span><SbLink drink={f}/></div>)}</div></section>}
   <MyRatings tastings={data.tastings} own={p.own} viewer={me.id}/>

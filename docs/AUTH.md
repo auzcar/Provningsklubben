@@ -9,6 +9,7 @@
 - Administratörer: e-postadresserna i `ADMIN_EMAILS` är alltid administratörer. En administratör kan dessutom göra andra medlemmar till administratörer i appen.
 - Inaktiverade medlemmar stoppas i varje API-anrop, även om de har kvar en giltig inloggning eller en inbjudningslänk till en provning.
 - Värdskap gäller fortfarande per provning (`tastings.owner`). En delad provningslänk ger ingen åtkomst utan inloggat medlemskonto.
+- Undantag, godkänt av ägaren 2026-10-27: kalenderprenumerationen (`app/api/calendar`). Kalenderappar kan inte logga in, så flödet nås med en hemlig, slumpad token per medlem (tabellen `calendar_feeds`, 48 hexadecimala tecken). Flödet visar bara titel, datum, tid, plats, tema och värd för provningar där medlemmen är värd, deltar eller är inbjuden, aldrig drycker eller betyg. Inaktiverade medlemmars länkar slutar fungera, och medlemmen kan byta token under Profil → Kalender. I Sites-gatewayläget kräver gatewayen inloggning för alla adresser, så prenumerationen fungerar bara i Clerk-läget.
 
 ## Profiler
 

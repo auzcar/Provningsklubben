@@ -12,6 +12,7 @@ export const BACKUP_TABLES={
  shopping_items:['user','key','data','created_at'],
  pending_profiles:['email','name','history_names','mime','avatar','created_at'],
 } as const;
+// calendar_feeds is left out on purpose: its tokens are secret links, and a member gets a new one after a restore.
 export type Backup={format:2;created:string;tables:Record<string,Record<string,unknown>[]>};
 
 // One D1 batch runs as a single transaction, so all tables come from the same moment.
