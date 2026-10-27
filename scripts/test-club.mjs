@@ -142,7 +142,7 @@ console.log('Calendar test passed');
  await post('host',{action:'next',id:tid}); await post('guest',{action:'vote',id:tid,sample:'v',vote:{score:7}});await post('host',{action:'vote',id:tid,sample:'v',vote:{score:8}});
  // Someone outside the tasting is not affected, and after the reveal everyone is free again.
  const hist=await route('history',env);assert.equal((await hist.GET(new Request('https://test.local/api/history',{headers:{'oai-authenticated-user-id':'stranger2'}}))).status,200);
- t=await post('host',{action:'reveal',id:tid});assert.equal(t.status,'revealed');await post('host',{action:'reveal-all',id:tid});
+ t=await post('host',{action:'reveal',id:tid});assert.equal(t.status,'revealed');await post('host',{action:'reveal-all',id:tid});await post('host',{action:'finish',id:tid});
  assert.equal((await hist.GET(new Request('https://test.local/api/history',{headers:{'oai-authenticated-user-id':'guest'}}))).status,200);
  await post('host',{action:'create',title:'Fri igen'});
  // A tasting left open since an earlier day no longer locks.
@@ -192,7 +192,10 @@ console.log('Host and simulation tests passed');
  // Everyone at the table stays in the reveal until the host has shown it all.
  const hist=await route('history',env);const status=async u=>(await hist.GET(new Request('https://test.local/api/history',{headers:{'oai-authenticated-user-id':u}}))).status;
  assert.equal(await status('late'),423);assert.ok((await get('late',null)).sessions.find(x=>x.id===tid).revealing);
- await post('host',{action:'reveal-all',id:tid});assert.equal(await status('late'),200);assert.ok(!(await get('late',null)).sessions.find(x=>x.id===tid).revealing);}
+ // After the reveal the evening stays in tasting mode (bottles) until the host ends it.
+ await post('host',{action:'reveal-all',id:tid});assert.equal(await status('late'),423);assert.equal((await get('late',tid)).finished,false);
+ await post('late',{action:'finish',id:tid},false);
+ await post('host',{action:'finish',id:tid});assert.equal(await status('late'),200);assert.ok(!(await get('late',null)).sessions.find(x=>x.id===tid).revealing);assert.equal((await get('late',tid)).finished,true);}
 console.log('Step test passed');
 // Bottles to take home: favourite first; clashes by love above own average, then loss, then a draw.
 {const {allocate}=await import('../.sites-runtime/tests/lib/allocation.mjs');

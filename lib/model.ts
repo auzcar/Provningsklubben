@@ -62,6 +62,10 @@ export function systembolagetUrl(p:{productUrl?:string;article?:string;name?:str
 export function revealDone(plan:any){return !Array.isArray(plan?.revealOrder)||(Number(plan.revealAt)||0)>plan.revealOrder.length;}
 export const revealDoneSql=(data='data')=>`(json_extract(${data},'$.revealOrder') IS NULL OR coalesce(json_extract(${data},'$.revealAt'),0)>json_array_length(${data},'$.revealOrder'))`;
 // Reveal order: drinks with at least one score, from the lowest average to the highest.
+// After the reveal the evening goes on in tasting mode (the reveal, then sharing out the bottles) until
+// the host ends it (plan.finished). Until then everyone at the table stays locked in. Tastings revealed
+// before this existed have no revealOrder and are never held.
+export const eveningOpenSql=(data='data')=>`(json_extract(${data},'$.revealOrder') IS NOT NULL AND coalesce(json_extract(${data},'$.finished'),0)=0)`;
 export function revealOrder(samples:Sample[],votes:{sample:string;score:number|null}[]){
  const avg=(id:string)=>{const s=votes.filter(v=>v.sample===id&&v.score!=null).map(v=>v.score as number);return s.length?s.reduce((a,b)=>a+b,0)/s.length:null;};
  return samples.map(s=>({id:s.id,a:avg(s.id)})).filter(x=>x.a!=null).sort((x,y)=>x.a!-y.a!).map(x=>x.id);

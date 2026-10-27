@@ -32,6 +32,7 @@ await call(club,'boss','/api/club',{action:'reveal',id:t.id});
 // Results reach profiles only once the host has played the whole reveal.
 assert.equal((await call(profile,'stranger','/api/profile?user=guest')).tastings.length,0);
 await call(club,'boss','/api/club',{action:'reveal-all',id:t.id});
+await call(club,'boss','/api/club',{action:'finish',id:t.id});
 p=await call(profile,'boss','/api/profile?user=guest');assert.equal(p.tastings[0].samples[0].name,'Hemlig rom');assert.equal(p.tastings[0].samples[0].score,9);assert.equal(p.tastings[0].samples[0].average,8);assert.equal(p.stats.ratings,1);assert.ok('price' in p.tastings[0].samples[0]&&'volume' in p.tastings[0].samples[0]);
 
 // Historical archive names can be linked to a member by the admin.
@@ -124,6 +125,7 @@ assert.equal(tt.progress.length,2);assert.equal(tt.waiting.length,1);
 await call(club,'boss','/api/club',{action:'vote',id:tt.id,sample:'x1',vote:{score:8}},200,as('test:host'));
 tt=await call(club,'boss','/api/club',{action:'reveal',id:tt.id},200,as('test:host'));assert.equal(tt.status,'revealed');
 tt=await call(club,'boss','/api/club',{action:'reveal-all',id:tt.id},200,as('test:host'));
+tt=await call(club,'boss','/api/club',{action:'finish',id:tt.id},200,as('test:host'));
 assert.equal(tt.results.find(v=>v.name==='Testa Testsson').score,7);
 assert.ok((await call(history,'boss','/api/history',undefined,200,as('test:2'))).sessions.some(x=>x.title==='Testkväll'));
 assert.ok(!(await call(history,'guest','/api/history')).sessions.some(x=>x.title==='Testkväll'));
@@ -166,6 +168,7 @@ await call(club,'boss','/api/club?id='+gk.id,undefined,400);
 await call(club,'guest','/api/club',{action:'reveal',id:gk.id});
 await call(club,'boss','/api/club?id='+gk.id,undefined,400);
 await call(club,'guest','/api/club',{action:'reveal-all',id:gk.id});
+await call(club,'guest','/api/club',{action:'finish',id:gk.id});
 assert.equal((await call(club,'boss','/api/club?id='+gk.id)).status,'revealed');
 assert.equal((await call(club,'stranger','/api/club?id='+gk.id)).status,'revealed');
 // Admin can complete archive data; nobody else can, and scores stay as they were.

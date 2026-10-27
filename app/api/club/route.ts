@@ -1,5 +1,5 @@
 import {env} from 'cloudflare:workers';
-import {validatePlan,validateSnacks,validateVote,costShare,revealDone,revealOrder,revealDoneSql} from '@/lib/model';
+import {validatePlan,validateSnacks,validateVote,costShare,revealDone,revealOrder,eveningOpenSql} from '@/lib/model';
 import {requireMember,requireAdmin,reply,fail,sameOrigin,runningTastings,AuthError,LOCKED} from '@/lib/auth';
 import {isTestUser,TEST_USERS} from '@/lib/test-users';
 import {stageOf,publicStage} from '@/lib/program';
@@ -35,11 +35,11 @@ async function detail(id:string,user:string){
  if(s.status==='active'&&stage.sample!=null){const sid=plan.samples[stage.sample].id;const w=(people as any[]).filter(p=>!all0(p.user,sid));waiting=w.map(p=>p.name);waitingUsers=w.map(p=>p.user);}
  // Participants pay the host by Swish; the host sees who has marked themselves as paid.
  const pay=member&&!host&&owner?.swish?{to:owner.name,swish:owner.swish,amount:cost.perPerson&&cost.perPerson>0?cost.perPerson:null,paid:!!(member as any).paid}:undefined;
- return {id:s.id,title:s.title,date:s.date,status:s.status,version:s.version,host,self:user,joined:!!member,cost,pay,stage,waiting,waitingUsers,reveal,ratings:ratingsForHost,allocation:allocationView(plan,host),hostSwish:host?owner?.swish||'':undefined,token:host?s.token:undefined,plan:host?plan:{theme:plan.theme,time:plan.time||'',endTime:plan.endTime||'',location:plan.location||'',participants:plan.participants||[],served:plan.served??null,samples:plan.samples.map((x:any)=>s.status==='revealed'&&shown.has(x.id)?x:{id:x.id,number:x.number})},people:host?people:people.map(({paid,...p}:any)=>p),progress,mine:Object.fromEntries(mine.map((v:any)=>[v.sample,JSON.parse(v.data)])),results:all.map((v:any)=>({...JSON.parse(v.data),sample:v.sample,name:v.name}))};
+ return {id:s.id,title:s.title,date:s.date,status:s.status,version:s.version,host,self:user,joined:!!member,cost,pay,stage,waiting,waitingUsers,reveal,ratings:ratingsForHost,allocation:allocationView(plan,host),finished:s.status==='revealed'&&!(Array.isArray(plan.revealOrder)&&!plan.finished),hostSwish:host?owner?.swish||'':undefined,token:host?s.token:undefined,plan:host?plan:{theme:plan.theme,time:plan.time||'',endTime:plan.endTime||'',location:plan.location||'',participants:plan.participants||[],served:plan.served??null,samples:plan.samples.map((x:any)=>s.status==='revealed'&&shown.has(x.id)?x:{id:x.id,number:x.number})},people:host?people:people.map(({paid,...p}:any)=>p),progress,mine:Object.fromEntries(mine.map((v:any)=>[v.sample,JSON.parse(v.data)])),results:all.map((v:any)=>({...JSON.parse(v.data),sample:v.sample,name:v.name}))};
 }
 // During a running tasting only that tasting answers (lib/auth.ts); the list stays so the app can find it.
 async function onlyRunning(user:string,id:any){const running=await runningTastings(db(),user);if(running.length&&!running.includes(String(id||'')))throw new AuthError(LOCKED,423);}
-export async function GET(r:Request){try{const me=await requireMember(r,env,{duringTasting:true}),user=me.id;const id=new URL(r.url).searchParams.get('id');if(id)await onlyRunning(user,id);if(id)return reply(await detail(id,user));const rows=(await db().prepare("SELECT DISTINCT t.id,t.title,t.date,json_extract(t.data,'$.time') time,t.status,t.owner,CASE WHEN t.status='revealed' AND NOT "+revealDoneSql('t.data')+" THEN 1 ELSE 0 END revealing FROM tastings t LEFT JOIN members m ON t.id=m.session WHERE t.owner=? OR m.user=? ORDER BY t.date DESC").bind(user,user).all()).results;return reply({user,sessions:rows.map((s:any)=>({...s,host:s.owner===user,owner:undefined}))});}catch(e:any){return fail(e)}}
+export async function GET(r:Request){try{const me=await requireMember(r,env,{duringTasting:true}),user=me.id;const id=new URL(r.url).searchParams.get('id');if(id)await onlyRunning(user,id);if(id)return reply(await detail(id,user));const rows=(await db().prepare("SELECT DISTINCT t.id,t.title,t.date,json_extract(t.data,'$.time') time,t.status,t.owner,CASE WHEN t.status='revealed' AND "+eveningOpenSql('t.data')+" THEN 1 ELSE 0 END revealing FROM tastings t LEFT JOIN members m ON t.id=m.session WHERE t.owner=? OR m.user=? ORDER BY t.date DESC").bind(user,user).all()).results;return reply({user,sessions:rows.map((s:any)=>({...s,host:s.owner===user,owner:undefined}))});}catch(e:any){return fail(e)}}
 export async function POST(r:Request){try{
  if(!sameOrigin(r))return reply({error:'Ogiltig begäran.'},403);
  const me=await requireMember(r,env,{duringTasting:true}),user=me.id;const b:any=await r.json();let id=b.id;
@@ -141,6 +141,11 @@ export async function POST(r:Request){try{
   }
  }
  await db().prepare("UPDATE tastings SET data=json_set(data,'$.allocation',json(?)) WHERE id=? AND status='revealed'").bind(JSON.stringify(a),id).run();
+ }else if(b.action==='finish'){
+ // The host ends the evening after the reveal (with or without sharing out the bottles); then
+ // everyone is free to leave tasting mode.
+ if(s.status!=='revealed'||!revealDone(plan))throw Error('Avslöja hela resultatet först.');
+ await db().prepare("UPDATE tastings SET data=json_set(data,'$.finished',json('true')) WHERE id=? AND status='revealed'").bind(id).run();
  }else if(b.action==='rate-for'){
  // The host corrects a participant's rating (a slip of the finger, or a second thought) on any drink
  // that has been served, as long as the tasting is on. Only the host can do this.

@@ -369,3 +369,6 @@ button.tm-guest{border:0;background:transparent;color:inherit;padding:0;font:inh
 [data-theme=light] .tm-ring-svg path{stroke:#d3bf9a}[data-theme=light] .tm-ring-svg path.on{stroke:#2f8a4f}
 .tm-guest.behind .tm-ring,.tm-guest.ready .tm-ring{animation:none!important}.tm-guest.behind small{color:inherit}
 .tm-check{background:#4caf6e}
+/* The reveal, results and bottles in tasting mode until the host ends the evening (app/club.tsx) */
+.finale-body{flex:1;width:100%;max-width:900px;margin:0 auto;padding:10px 16px 20px;box-sizing:border-box}
+.finale .reveal-show{min-height:calc(100vh - 160px)}
