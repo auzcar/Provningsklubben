@@ -15,7 +15,7 @@ async function detail(id:string,user:string){
  const all=s.status==='revealed'?(await db().prepare('SELECT r.sample,r.data,m.name FROM ratings r JOIN members m ON r.session=m.session AND r.user=m.user WHERE r.session=?').bind(id).all()).results:[];
  const headcount=s.status==='draft'?(plan.participants||[]).length:people.length;
  const owner:any=await db().prepare('SELECT name,swish FROM profiles WHERE user=?').bind(s.owner).first();
- const cost=costShare(plan.samples,headcount);
+ const cost=costShare(plan.samples,headcount,plan.snacks||[]);
  // Participants pay the host by Swish; the host sees who has marked themselves as paid.
  const pay=member&&!host&&owner?.swish?{to:owner.name,swish:owner.swish,amount:cost.perPerson&&cost.perPerson>0?cost.perPerson:null,paid:!!(member as any).paid}:undefined;
  return {id:s.id,title:s.title,date:s.date,status:s.status,version:s.version,host,self:user,joined:!!member,cost,pay,hostSwish:host?owner?.swish||'':undefined,token:host?s.token:undefined,plan:host?plan:{theme:plan.theme,participants:plan.participants||[],served:plan.served??null,samples:visibleSamples(plan.samples,false,s.status==='revealed')},people:host?people:people.map(({paid,...p}:any)=>p),progress,mine:Object.fromEntries(mine.map((v:any)=>[v.sample,JSON.parse(v.data)])),results:all.map((v:any)=>({...JSON.parse(v.data),sample:v.sample,name:v.name}))};
@@ -25,7 +25,7 @@ export async function POST(r:Request){try{
  if(!sameOrigin(r))return reply({error:'Ogiltig begäran.'},403);
  const me=await requireMember(r,env),user=me.id;const b:any=await r.json();let id=b.id;
  if(b.action==='create'){
- id=crypto.randomUUID();const plan={theme:'',notes:'',budget:null,expected:[],participants:[user],samples:[]};
+ id=crypto.randomUUID();const plan={theme:'',notes:'',budget:null,expected:[],participants:[user],samples:[],snacks:[]};
  await db().prepare('INSERT INTO tastings(id,owner,status,title,date,data,token,version) VALUES(?,?,?,?,?,?,?,1)').bind(id,user,'draft',String(b.title||'Ny provning').slice(0,150),'',JSON.stringify(plan),crypto.randomUUID()+crypto.randomUUID()).run();return reply(await detail(id,user));}
  const s:any=await db().prepare('SELECT * FROM tastings WHERE id=?').bind(id).first();if(!s)throw Error('Provningen finns inte.');
  // Test tastings and real tastings never share people.

@@ -251,6 +251,9 @@ body:has(.test-bar){padding-top:40px}body:has(.test-bar) .tasting-mode,body:has(
 .shopping-list{list-style:none;margin:8px 0;padding:0;display:grid;gap:2px}.shopping-list li{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #d8c7a633}
 .shopping-list label{display:flex;align-items:flex-start;gap:8px;flex:1;min-width:0;cursor:pointer}.shopping-list label span{display:flex;flex-direction:column;min-width:0}.shopping-list small{color:var(--muted);font-size:12px}
 .shopping-list li.done b{text-decoration:line-through;opacity:.6}
+.summary-panel h3.shopping-group{margin:16px 0 0;font-size:13px;font-weight:600;letter-spacing:.4px;color:var(--muted)}
+.snack-add{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:10px 0 4px}.snack-add input:first-child{grid-column:1/-1}.snack-add input{min-height:38px;padding:8px 10px}.snack-add button{grid-column:1/-1}
+.snack-ideas{display:flex;flex-wrap:wrap;gap:5px;margin:8px 0 6px}.snack-ideas .chip{display:inline-flex;align-items:center;gap:3px;font-size:12px;padding:3px 9px}
 .archive-edit{margin:8px 0 12px;padding:12px;border:1px dashed #c9b48e;border-radius:4px}.archive-edit .form-grid{margin-bottom:8px}
 @media(min-width:761px){body:has(.test-bar) .sidebar{top:40px;height:calc(100vh - 40px)}}
 /* All ratings on the profile (app/my-ratings.tsx) */
