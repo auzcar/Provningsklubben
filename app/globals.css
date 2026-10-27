@@ -345,3 +345,11 @@ body:has(.test-bar){padding-top:40px}body:has(.test-bar) .tasting-mode,body:has(
 .tm-step-bar{display:flex;flex-direction:column;align-items:stretch;gap:6px;width:100%}.tm-step-bar small{color:var(--muted);font-size:13px;text-align:center}.tm-step-bar .tm-nav.next{margin-left:0;justify-content:center}
 .tm-foot-note{color:var(--muted);font-size:13px;text-align:center;width:100%;padding:12px 0}
 [data-theme=light] .tm-cheers .tm-host-only{background:#efe3c9}
+/* Who has rated the drink on the table, the host's rating corrections, and the followed reveal */
+button.tm-guest{border:0;background:transparent;color:inherit;padding:0;font:inherit;cursor:pointer}
+.tm-guest{position:relative}.tm-check{position:absolute;top:28px;left:31px;width:17px;height:17px;border-radius:50%;background:#3f8f5a;color:#fff;display:grid;place-items:center;border:2px solid var(--bg)}
+.tm-guest.ready .tm-ring{animation:none}
+.tm-nav.reveal{justify-content:center;border-color:var(--brass);color:var(--brass-l)}
+.tm-fix-row{display:grid;grid-template-columns:minmax(0,1fr) 70px auto auto;gap:8px;align-items:center;padding:10px 0;border-top:1px solid var(--line)}.tm-fix-row small{color:var(--muted)}.tm-fix-row input[inputmode]{min-height:38px;padding:6px 8px;text-align:center}
+.reveal-show.following{cursor:default}
+@media (max-width:420px){.tm-fix-row{grid-template-columns:minmax(0,1fr) 60px auto;}.tm-fix-row .secondary{grid-column:1/-1}}

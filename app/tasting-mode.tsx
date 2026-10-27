@@ -23,7 +23,7 @@ const PROMPTS=['Vad påminner doften om? Alla säger ett ord samtidigt.','Gissa 
 // The host rates too and moves on only when everyone has rated the drink on the table. The drink's
 // identity shows to the host only while a button is held. While a tasting is on, everyone is held
 // here (locked) until the reveal, except for the host's option to cancel the tasting.
-export default function TastingMode({current,onExit,onReveal,canReveal,revealHint,onCopyLink,onRemove,onNext,onPaid,busy,locked=false,onCancel}:{current:any;locked?:boolean;onCancel?:()=>void;onPaid:(paid:boolean)=>void;onExit:()=>void;onReveal:()=>void;canReveal:boolean;revealHint:string;onCopyLink:()=>void;onRemove:(user:string,name:string)=>void;onNext:()=>void;busy:boolean}){
+export default function TastingMode({current,onExit,onReveal,canReveal,revealHint,onCopyLink,onRemove,onNext,onPaid,onRateFor,busy,locked=false,onCancel}:{current:any;locked?:boolean;onCancel?:()=>void;onRateFor:(user:string,sample:string,vote:Vote)=>Promise<any>;onPaid:(paid:boolean)=>void;onExit:()=>void;onReveal:()=>void;canReveal:boolean;revealHint:string;onCopyLink:()=>void;onRemove:(user:string,name:string)=>void;onNext:()=>void;busy:boolean}){
  const samples=current.plan.samples as any[];
  const stage=current.stage||{step:null,total:samples.length,reached:0,sample:null,last:false,kind:null,title:''};
  const onTable:number|null=stage.sample;const reached:number=stage.reached;
@@ -38,7 +38,8 @@ export default function TastingMode({current,onExit,onReveal,canReveal,revealHin
  const completed=samples.filter(s=>done(votes[s.id])).length;
  const people=current.people as any[];
  const progress=(u:string)=>current.progress.find((x:any)=>x.user===u)?.completed||0;
- const waiting:string[]=current.waiting||[];
+ const waiting:string[]=current.waiting||[];const waitingUsers:string[]=current.waitingUsers||[];
+ const [fixing,setFixing]=useState<string|null>(null);
  // Host only: the full running order, with snacks and notes.
  const snacks=(current.plan.snacks||[]) as any[];const snackName=new Map(snacks.map(x=>[x.id,x.name]));
  const program=current.host?normalizeProgram(current.plan.program,samples,snacks.map(x=>x.id)):[];
@@ -79,10 +80,11 @@ export default function TastingMode({current,onExit,onReveal,canReveal,revealHin
   </header>
 
   <section className="tm-table" aria-label="Vid bordet">
-   {people.map(p=>{const n=progress(p.user),pct=Math.round(n/Math.max(1,samples.length)*100);const behind=onTable!=null&&waiting.includes(p.name);return <div className={'tm-guest'+(behind?' behind':'')} key={p.user} title={`${p.name}: ${n} av ${samples.length}`}>
+   {people.map(p=>{const n=progress(p.user),pct=Math.round(n/Math.max(1,samples.length)*100);const behind=onTable!=null&&waitingUsers.includes(p.user);const Tag:any=current.host?'button':'div';return <Tag className={'tm-guest'+(behind?' behind':'')+(onTable!=null&&!behind?' ready':'')} key={p.user} title={`${p.name}: ${n} av ${samples.length}`} {...(current.host?{type:'button',onClick:()=>setFixing(p.user),'aria-label':'Visa och rätta betygen för '+p.name}:{})}>
     <span className="tm-ring" style={{background:`conic-gradient(var(--brass) ${pct}%, var(--ring-rest) 0)`}}><Avatar user={p.user} version={avatars[p.user]||0} name={p.name} size={34}/></span>
+    {onTable!=null&&!behind&&<span className="tm-check" aria-label="Har betygsatt provet på bordet"><Check size={11} strokeWidth={3}/></span>}
     <small>{p.user===current.self?'Du':p.name.split(' ')[0]}</small>
-   </div>;})}
+   </Tag>;})}
   </section>
 
   <nav className="tm-dots" aria-label="Prov">{samples.map((s,i)=>{const open=i<reached;return <button key={s.id} disabled={!open} aria-label={`Prov ${i+1}${done(votes[s.id])?', betygsatt':''}${onTable===i?', på bordet':''}${open?'':', inte serverat än'}`} aria-current={i===shown} className={(done(votes[s.id])?'done ':'')+(i===shown?'here ':'')+(onTable===i?'served ':'')+(open?'':'locked')} onClick={()=>view(i)}/>;})}</nav>
@@ -156,6 +158,7 @@ export default function TastingMode({current,onExit,onReveal,canReveal,revealHin
    {current.host?<div className="tm-step-bar">
     {nextItem?<>
      {onTable!=null&&waiting.length>0&&<small>Väntar på betyg från {waiting.join(', ')}</small>}
+     {canReveal&&<button className="tm-nav reveal" disabled={busy} onClick={onReveal}><Eye size={17}/>Avslöja resultatet nu</button>}
      <button className="tm-nav next" disabled={busy||!canNext} onClick={()=>{flush();onNext();}}>{busy?<LoaderCircle size={17} className="spin"/>:null}{stage.step==null?'Ställ fram':'Servera nästa'}: {itemLabel(nextItem)}<ArrowRight size={18}/></button>
     </>:<>
      <small>Allt är serverat.{canReveal?'':' '+revealHint}</small>
@@ -181,6 +184,8 @@ export default function TastingMode({current,onExit,onReveal,canReveal,revealHin
    </section>
   </div>}
 
+  {fixing&&current.host&&<FixRatings person={people.find(p=>p.user===fixing)} samples={samples.slice(0,reached)} ratings={(current.ratings||[]).filter((r:any)=>r.user===fixing)} onTable={onTable} busy={busy} onSave={(sample:string,v:Vote)=>onRateFor(fixing,sample,v)} onClose={()=>setFixing(null)}/>}
+
   {panel&&current.host&&<div className="tm-sheet-backdrop" onClick={()=>setPanel(false)}>
    <section className="tm-sheet" onClick={e=>e.stopPropagation()} aria-label="Värdpanel">
     <div className="row between"><h2>Värdpanel</h2><button className="tm-icon dark" aria-label="Stäng" onClick={()=>setPanel(false)}><X size={18}/></button></div>
@@ -193,5 +198,28 @@ export default function TastingMode({current,onExit,onReveal,canReveal,revealHin
     {onCancel&&<button className="text-button danger full" disabled={busy} onClick={onCancel}>Avbryt och ta bort provningen</button>}
    </section>
   </div>}
+ </div>;
+}
+
+// Host only: one participant's ratings on the drinks served so far, editable. Saved one drink at a time.
+function FixRatings({person,samples,ratings,onTable,busy,onSave,onClose}:{person:any;samples:any[];ratings:any[];onTable:number|null;busy:boolean;onSave:(sample:string,v:Vote)=>Promise<any>;onClose:()=>void}){
+ const init=()=>Object.fromEntries(samples.map(s=>{const r=ratings.find(x=>x.sample===s.id);return [s.id,{score:r?.score==null?'':String(r.score).replace('.',','),skip:!!r?.skip,has:!!r}];}));
+ const [rows,setRows]=useState<Record<string,{score:string;skip:boolean;has:boolean}>>(init);const [saved,setSaved]=useState('');const [error,setError]=useState('');
+ if(!person)return null;
+ const store=async(s:any)=>{const r=rows[s.id];const r0=ratings.find(x=>x.sample===s.id);const score=r.skip?null:Number(r.score.replace(',','.'));
+  if(!r.skip&&(r.score===''||!Number.isFinite(score)||score!<0||score!>10)){setError('Ange ett betyg mellan 0 och 10 för prov '+s.number+'.');return;}
+  setError('');try{await onSave(s.id,{score,skip:r.skip,comment:r0?.comment||'',tags:r0?.tags||[],guess:r0?.guess??null});setSaved(s.id);setTimeout(()=>setSaved(''),1500);}catch(e:any){setError(e.message);}};
+ return <div className="tm-sheet-backdrop" onClick={onClose}>
+  <section className="tm-sheet tm-fix" onClick={e=>e.stopPropagation()} aria-label={'Betyg för '+person.name}>
+   <div className="row between"><h2>{person.name}</h2><button className="tm-icon dark" aria-label="Stäng" onClick={onClose}><X size={18}/></button></div>
+   <p className="muted fine">Som värd kan du rätta ett betyg, till exempel om någon tryckt fel. Bara du ser betygen före avslöjandet.</p>
+   {samples.length?samples.map((s,i)=>{const r=rows[s.id];return <div className="tm-fix-row" key={s.id}>
+    <span><b>Prov {pad(s.number)}</b>{i===onTable&&<small> · på bordet</small>}{!r.has&&<small> · inget betyg</small>}</span>
+    <input inputMode="decimal" aria-label={'Betyg för prov '+s.number} value={r.skip?'':r.score} disabled={r.skip} placeholder="–" onChange={e=>setRows({...rows,[s.id]:{...r,score:e.target.value}})}/>
+    <label className="tm-toggle"><input type="checkbox" checked={r.skip} onChange={e=>setRows({...rows,[s.id]:{...r,skip:e.target.checked}})}/>Avstår</label>
+    <button className="secondary small" disabled={busy} onClick={()=>store(s)}>{saved===s.id?<><Check size={14}/>Sparat</>:'Spara'}</button>
+   </div>;}):<p className="muted">Inget prov har ställts fram än.</p>}
+   {error&&<p className="inline-error">{error}</p>}
+  </section>
  </div>;
 }

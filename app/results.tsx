@@ -1,5 +1,5 @@
 'use client';
-import {useEffect,useState} from 'react';
+import {useState} from 'react';
 import {Trophy,Flame,Handshake,PiggyBank,Target,Heart,Gavel,Sparkles,ArrowUpRight,Play,ChevronRight} from 'lucide-react';
 import {productImage,systembolagetUrl} from '@/lib/model';
 import SbLink from './sb-link';
@@ -9,7 +9,7 @@ const kr=(n:any)=>n==null?'–':Math.round(n).toLocaleString('sv-SE')+' kr';
 const mean=(a:number[])=>a.length?a.reduce((x,y)=>x+y,0)/a.length:null;
 
 // The reveal: a podium and a handful of awards meant to start conversations.
-export default function Results({current}:{current:any}){
+export default function Results({current,busy=false,onRevealNext,onRevealAll}:{current:any;busy?:boolean;onRevealNext?:()=>void;onRevealAll?:()=>void}){
  const rows=current.plan.samples.map((s:any)=>{
   const ratings=current.results.filter((v:any)=>v.sample===s.id);
   const scores=ratings.filter((v:any)=>v.score!=null).map((v:any)=>v.score as number);
@@ -40,11 +40,13 @@ export default function Results({current}:{current:any}){
  ].filter(Boolean) as any[];
  const podium=[scored[1],scored[0],scored[2]].map((r,i)=>r&&{...r,place:[2,1,3][i]});
 
- // The dramatic reveal plays once per device and tasting, and can be replayed.
- const key='reveal-seen:'+current.id;const [show,setShow]=useState(false);
- useEffect(()=>{try{if(scored.length>1&&!localStorage.getItem(key))setShow(true);}catch{}},[key,scored.length]);
- const done=()=>{setShow(false);try{localStorage.setItem(key,'1');}catch{}};
- if(show)return <RevealShow rows={scored} title={current.title} onDone={done}/>;
+ // The reveal is played by the host for everyone at once (current.reveal); participants follow and
+ // only receive the drinks already shown. Afterwards anyone can replay it on their own device.
+ const [show,setShow]=useState(false);
+ const live=current.reveal&&!current.reveal.done?current.reveal:null;
+ if(live){const byId=new Map(rows.map((r:any)=>[r.id,r]));const order=live.shown.map((id:string)=>byId.get(id)).filter(Boolean);
+  return <RevealShow order={order} total={live.total} at={live.at} title={current.title} host={current.host} busy={busy} onNext={onRevealNext} onAll={onRevealAll}/>;}
+ if(show)return <RevealShow order={[...scored].reverse()} total={scored.length} title={current.title} onDone={()=>setShow(false)}/>;
  return <div className="results">
   <div className="results-intro"><div className="eyebrow">NU VET VI VAD SOM FANNS I GLASEN</div><h2>Kvällens resultat</h2><p>Betygen är låsta. Dags att diskutera.</p>{scored.length>1&&<button className="secondary small" onClick={()=>setShow(true)}><Play size={15}/>Spela upp avslöjandet igen</button>}</div>
   {scored.length>0&&<section className="podium" aria-label="Prispall">{podium.map((r:any)=>r&&<div key={r.id} className={'podium-step p'+r.place}>
@@ -62,20 +64,31 @@ export default function Results({current}:{current:any}){
  </div>;
 }
 
-// One drink at a time, from last place to the winner. Tap to continue.
-function RevealShow({rows,title,onDone}:{rows:any[];title:string;onDone:()=>void}){
- const order=[...rows].reverse();const [i,setI]=useState(-1);const r=order[i];const place=rows.length-i;const last=i===order.length-1;
- const next=()=>i<order.length-1?setI(i+1):onDone();
- return <div className="reveal-show" onClick={next} role="button" tabIndex={0} onKeyDown={e=>{if(e.key==='Enter'||e.key===' '||e.key==='ArrowRight')next();if(e.key==='Escape')onDone();}}>
-  <button className="text-button reveal-skip" onClick={e=>{e.stopPropagation();onDone();}}>Hoppa över</button>
-  {i<0?<div className="reveal-card intro"><div className="eyebrow">AVSLÖJANDET</div><h2>{title}</h2><p>{rows.length} drycker. Vi börjar från botten.</p><span className="reveal-tap">Tryck för att börja <ChevronRight size={16}/></span></div>
+// One drink at a time, from last place to the winner. Live (at given): the host taps to go on and the
+// others follow; the host can also skip to all results. Replay (no at): local, tap through.
+function RevealShow({order,total,at:liveAt,title,host=false,busy=false,onNext,onAll,onDone}:{order:any[];total:number;at?:number;title:string;host?:boolean;busy?:boolean;onNext?:()=>void;onAll?:()=>void;onDone?:()=>void}){
+ const live=liveAt!=null;const [own,setOwn]=useState(0);const at=live?liveAt:own;
+ const i=at-1;const r=i>=0?order[i]:null;const place=total-i;const last=i===total-1;
+ const canTap=!live||host;
+ const next=()=>{if(!canTap||busy)return;if(live)onNext?.();else if(at<total)setOwn(at+1);else onDone?.();};
+ const skip=()=>{if(live)onAll?.();else onDone?.();};
+ return <div className={'reveal-show'+(canTap?'':' following')} onClick={next} role={canTap?'button':undefined} tabIndex={canTap?0:undefined} onKeyDown={e=>{if(!canTap)return;if(e.key==='Enter'||e.key===' '||e.key==='ArrowRight')next();if(e.key==='Escape')skip();}}>
+  {canTap&&<button className="text-button reveal-skip" onClick={e=>{e.stopPropagation();if(!live||confirm('Visa alla resultat direkt för alla?'))skip();}}>{live?'Visa allt':'Hoppa över'}</button>}
+  {!r?<div className="reveal-card intro">
+<div className="eyebrow">AVSLÖJANDET</div>
+<h2>{title}</h2>
+<p>{total} drycker. Vi börjar från botten.</p>
+<span className="reveal-tap">{canTap?<>Tryck för att börja <ChevronRight size={16}/></>:'Värden avslöjar strax'}</span>
+</div>
   :<div key={i} className={'reveal-card'+(last?' winner':'')}>
-   <div className="reveal-place">{last?<Trophy size={44}/>:<span>{place}</span>}<small>{last?'KVÄLLENS VINNARE':place===2?'TVÅA':place===3?'TREA':'PLATS '+place}</small></div>
+   <div className="reveal-place">{last?<Trophy size={44}/>:<span>{place}</span>}<small>{last?'KVÄLLENS VINNARE':place===2?'TVÅA':place===3?'TREA':'PLATS '+place}</small>
+</div>
    {r.image&&<img src={productImage(r.image)} alt="" onError={e=>{e.currentTarget.style.display='none';}}/>}
-   <h2>{r.name}</h2><p>Prov {r.number}{r.price!=null?' · '+kr(r.price):''}</p>
+   <h2>{r.name}</h2>
+<p>Prov {r.number}{r.price!=null?' · '+kr(r.price):''}</p>
    <strong className="reveal-score">{fmt(r.average)}</strong>
-   <span className="reveal-tap">{last?'Tryck för alla resultat':'Nästa'} <ChevronRight size={16}/></span>
+   <span className="reveal-tap">{canTap?<>{last?'Tryck för alla resultat':'Nästa'} <ChevronRight size={16}/></>:last?'Värden visar alla resultat strax':'Värden visar nästa'}</span>
   </div>}
-  <div className="reveal-dots">{order.map((_:any,k:number)=><span key={k} className={k<=i?'on':''}/>)}</div>
+  <div className="reveal-dots">{Array.from({length:total},(_,k)=><span key={k} className={k<=i?'on':''}/>)}</div>
  </div>;
 }
