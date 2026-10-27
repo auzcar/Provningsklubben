@@ -70,8 +70,20 @@ export async function findMember(r:Request,env:AuthEnv,{ignoreTest=false}={}):Pr
  return {id:t.user,name:t.name,email:'',role:'member',admin:false,envAdmin:false,avatarVersion:t.avatar_version,tester:me.id};
 }
 
-export async function requireMember(r:Request,env:AuthEnv){const m=await findMember(r,env);if(!m)throw new AuthError(SIGNED_OUT);return m;}
-export async function requireAdmin(r:Request,env:AuthEnv,opts={}){const m=await findMember(r,env,opts);if(!m)throw new AuthError(SIGNED_OUT);if(!m.admin)throw new AuthError('Endast administratören kan göra detta.',403);return m;}
+// While a tasting someone hosts or has joined is on, the server answers that tasting only, so the
+// evening stays at the table on every device and browser. Routes the tasting itself needs opt in
+// with {duringTasting:true}; /api/club then limits requests to the running tasting. A tasting left
+// open from before yesterday (Swedish date) no longer locks anyone.
+export const LOCKED='Provningen pågår. Resten av klubben öppnas när resultatet har avslöjats.';
+export async function runningTastings(db:D1Database,user:string){
+ const yesterday=new Date(Date.now()-864e5).toLocaleDateString('sv-SE',{timeZone:'Europe/Stockholm'});
+ const rows=(await db.prepare("SELECT t.id FROM tastings t WHERE t.status='active' AND (t.date='' OR t.date>=?) AND (t.owner=? OR EXISTS(SELECT 1 FROM members m WHERE m.session=t.id AND m.user=?))").bind(yesterday,user,user).all()).results as any[];
+ return rows.map(x=>String(x.id));
+}
+type Guard={ignoreTest?:boolean;duringTasting?:boolean};
+async function notInTasting(env:AuthEnv,m:Member,opts:Guard){if(!opts.duringTasting&&env.DB&&(await runningTastings(env.DB,m.id)).length)throw new AuthError(LOCKED,423);return m;}
+export async function requireMember(r:Request,env:AuthEnv,opts:Guard={}){const m=await findMember(r,env,opts);if(!m)throw new AuthError(SIGNED_OUT);return notInTasting(env,m,opts);}
+export async function requireAdmin(r:Request,env:AuthEnv,opts:Guard={}){const m=await findMember(r,env,opts);if(!m)throw new AuthError(SIGNED_OUT);if(!m.admin)throw new AuthError('Endast administratören kan göra detta.',403);return notInTasting(env,m,opts);}
 
 export function sameOrigin(r:Request){const o=r.headers.get('origin');return !o||o===new URL(r.url).origin;}
 export function reply(data:any,status=200){return Response.json(data,{status,headers:{'Cache-Control':'no-store'}});}

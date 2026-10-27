@@ -31,14 +31,14 @@ async function feed(r:Request,token:string){
 }
 export async function GET(r:Request){try{
  const token=new URL(r.url).searchParams.get('feed');if(token!==null)return await feed(r,token);
- const me=await requireMember(r,env);if(me.tester)throw Error('Kalenderprenumeration finns inte i testläget.');
+ const me=await requireMember(r,env,{duringTasting:true});if(me.tester)throw Error('Kalenderprenumeration finns inte i testläget.');
  let row:any=await db().prepare('SELECT token FROM calendar_feeds WHERE user=?').bind(me.id).first();
  if(!row){await db().prepare('INSERT OR IGNORE INTO calendar_feeds(user,token,created_at) VALUES(?,?,?)').bind(me.id,newToken(),new Date().toISOString()).run();row=await db().prepare('SELECT token FROM calendar_feeds WHERE user=?').bind(me.id).first();}
  return reply({url:feedUrl(r,row.token)});
 }catch(e){return fail(e)}}
 export async function POST(r:Request){try{
  if(!sameOrigin(r))return reply({error:'Ogiltig begäran.'},403);
- const me=await requireMember(r,env);if(me.tester)throw Error('Kalenderprenumeration finns inte i testläget.');
+ const me=await requireMember(r,env,{duringTasting:true});if(me.tester)throw Error('Kalenderprenumeration finns inte i testläget.');
  const b:any=await r.json();if(b.action!=='reset')throw Error('Okänd åtgärd.');
  const token=newToken();
  await db().prepare('INSERT INTO calendar_feeds(user,token,created_at) VALUES(?,?,?) ON CONFLICT(user) DO UPDATE SET token=excluded.token,created_at=excluded.created_at').bind(me.id,token,new Date().toISOString()).run();

@@ -57,13 +57,13 @@ let plan=await call(club,'boss','/api/club',{action:'create',title:'Whiskykväll
 plan=await call(club,'boss','/api/club',{action:'save',id:plan.id,version:plan.version,title:'Whiskykväll',date:'',plan:{...plan.plan,participants:['boss','guest','nobody'],samples:[{id:'w1',name:'Arran',price:549,number:1},{id:'w2',name:'Macallan',price:500,number:2}]}});
 assert.equal(plan.cost.total,1049);assert.equal(plan.cost.people,3);assert.equal(plan.cost.perPerson,350);
 assert.ok(!(await call(club,'guest','/api/club')).sessions.some(x=>x.id===plan.id));
-plan=await call(club,'boss','/api/club',{action:'start',id:plan.id});assert.equal(plan.joined,true);assert.equal(plan.people.length,2);assert.equal(plan.cost.perPerson,525);
-let mine=await call(club,'guest','/api/club?id='+plan.id);assert.equal(mine.joined,true);assert.equal(mine.cost.perPerson,525);assert.equal(mine.plan.samples[0].name,undefined);
-await call(club,'guest','/api/club',{action:'delete',id:plan.id},400);
 // Swish: the host's number reaches participants with their share; they mark themselves as paid.
 await call(profile,'boss','/api/profile',{action:'update',name:'Boss',bio:'',swish:'12345'},400);
 await call(profile,'boss','/api/profile',{action:'update',name:'Boss',bio:'',swish:'+46 70-123 45 67'});
 assert.equal((await call(profile,'boss','/api/profile')).profile.swish,'0701234567');assert.equal((await call(profile,'guest','/api/profile?user=boss')).profile.swish,undefined);
+plan=await call(club,'boss','/api/club',{action:'start',id:plan.id});assert.equal(plan.joined,true);assert.equal(plan.people.length,2);assert.equal(plan.cost.perPerson,525);
+let mine=await call(club,'guest','/api/club?id='+plan.id);assert.equal(mine.joined,true);assert.equal(mine.cost.perPerson,525);assert.equal(mine.plan.samples[0].name,undefined);
+await call(club,'guest','/api/club',{action:'delete',id:plan.id},400);
 let g=await call(club,'guest','/api/club?id='+plan.id);assert.deepEqual(g.pay,{to:'Boss',swish:'0701234567',amount:525,paid:false});
 g=await call(club,'guest','/api/club',{action:'paid',id:plan.id,paid:true});assert.equal(g.pay.paid,true);assert.ok(g.people.every(x=>!('paid' in x)),'participants must not see payment flags');
 let hostView=await call(club,'boss','/api/club?id='+plan.id);assert.equal(hostView.pay,undefined);assert.equal(hostView.hostSwish,'0701234567');assert.equal(hostView.people.find(x=>x.user==='guest').paid,1);

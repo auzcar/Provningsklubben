@@ -1,6 +1,6 @@
 import {env} from 'cloudflare:workers';
 import {validatePlan,validateSnacks,validateVote,visibleSamples,costShare} from '@/lib/model';
-import {requireMember,requireAdmin,reply,fail,sameOrigin} from '@/lib/auth';
+import {requireMember,requireAdmin,reply,fail,sameOrigin,runningTastings,AuthError,LOCKED} from '@/lib/auth';
 import {isTestUser,TEST_USERS} from '@/lib/test-users';
 export const dynamic='force-dynamic';
 const db=()=>{if(!env.DB)throw Error('Databasen är inte tillgänglig.');return env.DB;};
@@ -20,10 +20,13 @@ async function detail(id:string,user:string){
  const pay=member&&!host&&owner?.swish?{to:owner.name,swish:owner.swish,amount:cost.perPerson&&cost.perPerson>0?cost.perPerson:null,paid:!!(member as any).paid}:undefined;
  return {id:s.id,title:s.title,date:s.date,status:s.status,version:s.version,host,self:user,joined:!!member,cost,pay,hostSwish:host?owner?.swish||'':undefined,token:host?s.token:undefined,plan:host?plan:{theme:plan.theme,time:plan.time||'',endTime:plan.endTime||'',location:plan.location||'',participants:plan.participants||[],served:plan.served??null,samples:visibleSamples(plan.samples,false,s.status==='revealed')},people:host?people:people.map(({paid,...p}:any)=>p),progress,mine:Object.fromEntries(mine.map((v:any)=>[v.sample,JSON.parse(v.data)])),results:all.map((v:any)=>({...JSON.parse(v.data),sample:v.sample,name:v.name}))};
 }
-export async function GET(r:Request){try{const me=await requireMember(r,env),user=me.id;const id=new URL(r.url).searchParams.get('id');if(id)return reply(await detail(id,user));const rows=(await db().prepare("SELECT DISTINCT t.id,t.title,t.date,json_extract(t.data,'$.time') time,t.status,t.owner FROM tastings t LEFT JOIN members m ON t.id=m.session WHERE t.owner=? OR m.user=? ORDER BY t.date DESC").bind(user,user).all()).results;return reply({user,sessions:rows.map((s:any)=>({...s,host:s.owner===user,owner:undefined}))});}catch(e:any){return fail(e)}}
+// During a running tasting only that tasting answers (lib/auth.ts); the list stays so the app can find it.
+async function onlyRunning(user:string,id:any){const running=await runningTastings(db(),user);if(running.length&&!running.includes(String(id||'')))throw new AuthError(LOCKED,423);}
+export async function GET(r:Request){try{const me=await requireMember(r,env,{duringTasting:true}),user=me.id;const id=new URL(r.url).searchParams.get('id');if(id)await onlyRunning(user,id);if(id)return reply(await detail(id,user));const rows=(await db().prepare("SELECT DISTINCT t.id,t.title,t.date,json_extract(t.data,'$.time') time,t.status,t.owner FROM tastings t LEFT JOIN members m ON t.id=m.session WHERE t.owner=? OR m.user=? ORDER BY t.date DESC").bind(user,user).all()).results;return reply({user,sessions:rows.map((s:any)=>({...s,host:s.owner===user,owner:undefined}))});}catch(e:any){return fail(e)}}
 export async function POST(r:Request){try{
  if(!sameOrigin(r))return reply({error:'Ogiltig begäran.'},403);
- const me=await requireMember(r,env),user=me.id;const b:any=await r.json();let id=b.id;
+ const me=await requireMember(r,env,{duringTasting:true}),user=me.id;const b:any=await r.json();let id=b.id;
+ await onlyRunning(user,b.action==='create'||b.action==='simulate'?'':id);
  if(b.action==='simulate'){
  // Test mode: copy the admin's own real plan to a test tasting hosted by Testvärden, with the test
  // members invited, so the evening can be run through before anyone real is invited. The original

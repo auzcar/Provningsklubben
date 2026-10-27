@@ -48,7 +48,8 @@ console.log('PASS: authorization, no premature disclosure, draft version conflic
  const g=await post('guest',{action:'join',id:tid,token:t.token,name:'Guest'});assert.equal(g.plan.snacks,undefined);assert.equal(g.plan.snackReceipt,undefined);
  await post('guest',{action:'snacks',id:tid,snacks:[]},false);
  t=await post('host',{action:'snacks',id:tid,snacks:[{id:'n9',name:'Vindruvor'}],snackReceipt:{total:100,note:''}});
- assert.deepEqual(t.plan.snacks,[{id:'n9',name:'Vindruvor',amount:'',section:'frukt',purchased:false}]);assert.equal(t.plan.snackReceipt.total,100);assert.equal(t.version,v);assert.equal(t.plan.samples[0].name,'Öl');}
+ assert.deepEqual(t.plan.snacks,[{id:'n9',name:'Vindruvor',amount:'',section:'frukt',purchased:false}]);assert.equal(t.plan.snackReceipt.total,100);assert.equal(t.version,v);assert.equal(t.plan.samples[0].name,'Öl');
+ await post('host',{action:'delete',id:tid});}
 console.log('Snacks test passed');
 // Time and place: validated, visible to participants, and written to the calendar file.
 {let t=await post('host',{action:'create',title:'Tid'});const tid=t.id;
@@ -63,7 +64,8 @@ console.log('Snacks test passed');
  assert.match(ics,/BEGIN:VTIMEZONE/);assert.match(ics,/SEQUENCE:3/);assert.match(ics,/SUMMARY:Provningsklubben: Tid\\, med komma/);
  const allDay=tastingIcs({id:'a',title:'A',date:'2026-12-31'},'https://x/');assert.match(allDay,/DTSTART;VALUE=DATE:20261231/);assert.match(allDay,/DTEND;VALUE=DATE:20270101/);assert.doesNotMatch(allDay,/VTIMEZONE/);
  assert.match(tastingIcs({id:'b',title:'B',date:'2026-07-01',time:'23:00'},'u'),/DTEND;TZID=Europe\/Stockholm:20260702T020000/);
- assert.ok(ics.split('\r\n').every(l=>new TextEncoder().encode(l).length<=75));}
+ assert.ok(ics.split('\r\n').every(l=>new TextEncoder().encode(l).length<=75));
+ await post('host',{action:'delete',id:tid});}
 console.log('Time test passed');
 // The evening program: drinks follow the tasting order, other items stay where they were put.
 {const P=await import('../.sites-runtime/tests/lib/program.mjs');
@@ -106,7 +108,24 @@ console.log('Calendar test passed');
 {let t=await post('host',{action:'create',title:'Värd deltar'});const tid=t.id;
  t=await post('host',{action:'save',id:tid,version:t.version,title:'Värd deltar',date:'',plan:{...t.plan,participants:['guest'],samples:[{id:'v',name:'X'}]}});
  assert.deepEqual(t.plan.participants,['host','guest']);
- t=await post('host',{action:'start',id:tid});assert.equal(t.joined,true);assert.deepEqual(t.people.map(p=>p.user).sort(),['guest','host']);}
+ t=await post('host',{action:'start',id:tid});assert.equal(t.joined,true);assert.deepEqual(t.people.map(p=>p.user).sort(),['guest','host']);
+ // While it runs, the server answers only this tasting for the people in it, on any device.
+ const other=await post('stranger2',{action:'create',title:'Annan'});
+ for(const u of ['host','guest']){
+  await get(u,other.id,false);await post(u,{action:'create',title:'Ny'},false);
+  const prof=await route('profile',env);assert.equal((await prof.GET(new Request('https://test.local/api/profile?user='+u,{headers:{'oai-authenticated-user-id':u}}))).status,423);
+  const hist=await route('history',env);assert.equal((await hist.GET(new Request('https://test.local/api/history',{headers:{'oai-authenticated-user-id':u}}))).status,423);
+  assert.equal((await get(u,tid)).id,tid);assert.ok((await get(u,null)).sessions.some(x=>x.id===tid));
+  const mem=await route('members',env);assert.equal((await mem.GET(new Request('https://test.local/api/members',{headers:{'oai-authenticated-user-id':u}}))).status,200);}
+ await post('guest',{action:'vote',id:tid,sample:'v',vote:{score:7}});await post('host',{action:'vote',id:tid,sample:'v',vote:{score:8}});
+ // Someone outside the tasting is not affected, and after the reveal everyone is free again.
+ const hist=await route('history',env);assert.equal((await hist.GET(new Request('https://test.local/api/history',{headers:{'oai-authenticated-user-id':'stranger2'}}))).status,200);
+ t=await post('host',{action:'reveal',id:tid});assert.equal(t.status,'revealed');
+ assert.equal((await hist.GET(new Request('https://test.local/api/history',{headers:{'oai-authenticated-user-id':'guest'}}))).status,200);
+ await post('host',{action:'create',title:'Fri igen'});
+ // A tasting left open since an earlier day no longer locks.
+ let old=await post('host',{action:'create',title:'Gammal'});old=await post('host',{action:'save',id:old.id,version:old.version,title:'Gammal',date:'2020-01-01',plan:{...old.plan,samples:[{id:'o',name:'O'}]}});
+ await post('host',{action:'start',id:old.id});await post('host',{action:'create',title:'Fortfarande fri'});}
 // Test mode: an admin copies their own real plan to a test tasting with the test members invited.
 {const adminEnv=env;adminEnv.ADMIN_EMAILS='boss@test.local';
  const areq=body=>new Request('https://test.local/api/club',{method:'POST',headers:{'oai-authenticated-user-id':'boss','oai-authenticated-user-email':'boss@test.local','Content-Type':'application/json','Origin':'https://test.local'},body:JSON.stringify(body)});
