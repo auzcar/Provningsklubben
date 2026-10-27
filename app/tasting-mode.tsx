@@ -80,8 +80,8 @@ export default function TastingMode({current,onExit,onReveal,canReveal,revealHin
   </header>
 
   <section className="tm-table" aria-label="Vid bordet">
-   {people.map(p=>{const n=progress(p.user),pct=Math.round(n/Math.max(1,samples.length)*100);const behind=onTable!=null&&waitingUsers.includes(p.user);const Tag:any=current.host?'button':'div';return <Tag className={'tm-guest'+(behind?' behind':'')+(onTable!=null&&!behind?' ready':'')} key={p.user} title={`${p.name}: ${n} av ${samples.length}`} {...(current.host?{type:'button',onClick:()=>setFixing(p.user),'aria-label':'Visa och rätta betygen för '+p.name}:{})}>
-    <span className="tm-ring" style={{background:`conic-gradient(var(--brass) ${pct}%, var(--ring-rest) 0)`}}><Avatar user={p.user} version={avatars[p.user]||0} name={p.name} size={34}/></span>
+   {people.map(p=>{const n=progress(p.user);const behind=onTable!=null&&waitingUsers.includes(p.user);const Tag:any=current.host?'button':'div';return <Tag className={'tm-guest'+(behind?' behind':'')+(onTable!=null&&!behind?' ready':'')} key={p.user} title={`${p.name}: ${n} av ${samples.length}`} {...(current.host?{type:'button',onClick:()=>setFixing(p.user),'aria-label':'Visa och rätta betygen för '+p.name}:{})}>
+    <span className="tm-ring"><Ring done={n} total={samples.length}/><Avatar user={p.user} version={avatars[p.user]||0} name={p.name} size={34}/></span>
     {onTable!=null&&!behind&&<span className="tm-check" aria-label="Har betygsatt provet på bordet"><Check size={11} strokeWidth={3}/></span>}
     <small>{p.user===current.self?'Du':p.name.split(' ')[0]}</small>
    </Tag>;})}
@@ -222,4 +222,12 @@ function FixRatings({person,samples,ratings,onTable,busy,onSave,onClose}:{person
    {error&&<p className="inline-error">{error}</p>}
   </section>
  </div>;
+}
+
+// Progress around a profile picture: one segment per drink with a small gap, green when rated.
+function Ring({done,total}:{done:number;total:number}){
+ const size=44,r=20,c=size/2,n=Math.max(1,total),gap=n>1?14:0,arc=360/n;
+ const pt=(deg:number)=>{const a=(deg-90)*Math.PI/180;return `${(c+r*Math.cos(a)).toFixed(2)} ${(c+r*Math.sin(a)).toFixed(2)}`;};
+ const seg=(i:number)=>{const a0=i*arc+gap/2,a1=(i+1)*arc-gap/2;return n===1?`M ${pt(0)} A ${r} ${r} 0 1 1 ${pt(359.9)}`:`M ${pt(a0)} A ${r} ${r} 0 ${a1-a0>180?1:0} 1 ${pt(a1)}`;};
+ return <svg className="tm-ring-svg" width={size} height={size} viewBox={`0 0 ${size} ${size}`} aria-hidden="true">{Array.from({length:n},(_,i)=><path key={i} d={seg(i)} className={i<done?'on':''}/>)}</svg>;
 }

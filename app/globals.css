@@ -363,3 +363,9 @@ button.tm-guest{border:0;background:transparent;color:inherit;padding:0;font:inh
 .share-latest .share-row{animation:pop .5s ease-out;border-width:2px}.share-wait{font-size:16px;margin:12px 0}
 @keyframes pop{from{transform:scale(.96);opacity:0}to{transform:none;opacity:1}}
 @media (max-width:560px){.share-row{grid-template-columns:36px minmax(0,1fr)}.share-row select{grid-column:1/-1;max-width:none}}
+/* Segmented progress rings at the table: green per rated drink, grey for the rest, no blinking */
+.tm-ring{position:relative;width:44px;height:44px;background:none!important;animation:none!important}
+.tm-ring-svg{position:absolute;inset:0}.tm-ring-svg path{fill:none;stroke:#5a3a40;stroke-width:3.5;stroke-linecap:round}.tm-ring-svg path.on{stroke:#4caf6e}
+[data-theme=light] .tm-ring-svg path{stroke:#d3bf9a}[data-theme=light] .tm-ring-svg path.on{stroke:#2f8a4f}
+.tm-guest.behind .tm-ring,.tm-guest.ready .tm-ring{animation:none!important}.tm-guest.behind small{color:inherit}
+.tm-check{background:#4caf6e}
