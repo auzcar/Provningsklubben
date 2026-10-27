@@ -3,13 +3,14 @@ import {useState} from 'react';
 import {Trophy,Flame,Handshake,PiggyBank,Target,Heart,Gavel,Sparkles,ArrowUpRight,Play,ChevronRight} from 'lucide-react';
 import {productImage,systembolagetUrl} from '@/lib/model';
 import SbLink from './sb-link';
+import BottleShare from './bottle-share';
 
 const fmt=(n:any,d=1)=>n==null?'–':Number(n).toLocaleString('sv-SE',{minimumFractionDigits:d,maximumFractionDigits:d});
 const kr=(n:any)=>n==null?'–':Math.round(n).toLocaleString('sv-SE')+' kr';
 const mean=(a:number[])=>a.length?a.reduce((x,y)=>x+y,0)/a.length:null;
 
 // The reveal: a podium and a handful of awards meant to start conversations.
-export default function Results({current,busy=false,onRevealNext,onRevealAll}:{current:any;busy?:boolean;onRevealNext?:()=>void;onRevealAll?:()=>void}){
+export default function Results({current,busy=false,onRevealNext,onRevealAll,onAllocate}:{current:any;busy?:boolean;onRevealNext?:()=>void;onRevealAll?:()=>void;onAllocate?:(action:string,extra?:any)=>void}){
  const rows=current.plan.samples.map((s:any)=>{
   const ratings=current.results.filter((v:any)=>v.sample===s.id);
   const scores=ratings.filter((v:any)=>v.score!=null).map((v:any)=>v.score as number);
@@ -61,6 +62,7 @@ export default function Results({current,busy=false,onRevealNext,onRevealAll}:{c
    <div className="ratings-grid">{p.ratings.map((v:any,j:number)=><div className="person-score" key={j}><span>{v.name}</span><strong>{v.skip?'Avstår':fmt(v.score)}</strong>{v.comment&&<p>{v.comment}</p>}</div>)}</div>
    {systembolagetUrl(p)&&<a className="text-button" href={systembolagetUrl(p)} target="_blank" rel="noreferrer">{p.productUrl?'Visa på Systembolaget':'Sök på Systembolaget'} <ArrowUpRight size={14}/></a>}
   </article>)}</section>
+ {onAllocate&&<BottleShare current={current} busy={busy} onAction={onAllocate}/>}
  </div>;
 }
 
