@@ -318,3 +318,15 @@ body:has(.test-bar){padding-top:40px}body:has(.test-bar) .tasting-mode,body:has(
 @media (max-width:640px){.program-item{grid-template-columns:64px 26px minmax(0,1fr);gap:8px}.program-item:not(:last-child)::after{left:84px}}
 /* Calendar subscription on the profile (app/calendar-subscribe.tsx) */
 .calendar-subscribe>p{max-width:640px;margin:8px 0 16px}.calendar-buttons{gap:8px;margin-bottom:10px}.calendar-subscribe>small{display:block;max-width:640px;margin-bottom:6px}
+/* The host's running order in tasting mode (app/tasting-mode.tsx) */
+.tm-host-icons{gap:6px}.tm-head .tm-title{flex:1}
+.tm-next{margin:10px 16px 0;max-width:588px;align-self:center;width:calc(100% - 32px);display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 14px;border-radius:6px;border:1px solid #5a2a32;background:transparent;color:var(--ink);font-size:13px;text-align:left}
+.tm-next>span:first-child{display:flex;align-items:baseline;gap:8px;min-width:0;flex-wrap:wrap}.tm-next small{font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--muted)}.tm-next b{font-size:15px}.tm-next i{font-style:normal;color:var(--muted)}
+.tm-program .tm-peek{margin:12px 0 4px;width:100%}
+.tm-run{list-style:none;margin:12px 0 0;padding:0}
+.tm-run li{display:grid;grid-template-columns:52px minmax(0,1fr);gap:10px;padding:10px 8px;border-top:1px solid var(--line);border-radius:4px}
+.tm-run li.past{opacity:.5}.tm-run li.now{background:#e9dcc1;border-top-color:transparent}.tm-run li.next{outline:1px dashed var(--label-line);outline-offset:-1px}
+.tm-run-time{font-variant-numeric:tabular-nums;color:var(--muted);font-size:14px;padding-top:1px}
+.tm-run b{font-size:15px}.tm-run b small{font-weight:400;color:var(--muted);font-size:12px}.tm-run p{font-size:13px;color:var(--muted);margin:3px 0 0}.tm-run p.tm-run-secret{color:var(--ink);font-weight:600}
+.tm-run-tag{font-size:11px;letter-spacing:.8px;text-transform:uppercase;background:var(--green);color:var(--label);border-radius:999px;padding:2px 8px;white-space:nowrap}.tm-run-tag.soft{background:transparent;color:var(--green);border:1px solid var(--green)}
+[data-theme=light] .tm-next{border-color:var(--line)}
