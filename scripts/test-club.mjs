@@ -38,3 +38,11 @@ const lager=hist.find(s=>s.title.includes('29/10 - 2020'));assert.equal(lager.sa
 const gin=hist.find(s=>s.title.includes('23/1 - 2021'));assert.equal(gin.samples.length,8);assert.deepEqual([...new Set(gin.samples.map(p=>p.serving))],['Rent','G&T']);
 }
 console.log('PASS: authorization, no premature disclosure, draft version conflicts, rating validation, zero/skip, reveal gating, locked results.');
+// Snacks on the host's shopping list: saved with the plan, counted in the cost, hidden from guests.
+{let t=await post('host',{action:'create',title:'Tilltugg'});const tid=t.id;assert.deepEqual(t.plan.snacks,[]);
+ t=await post('host',{action:'save',id:tid,version:t.version,title:'Tilltugg',date:'',plan:{...t.plan,samples:[{id:'b1',name:'Öl',price:30}],snacks:[{id:'n1',name:'Chips',amount:'2 påsar',price:40,purchased:true},{id:'n2',name:'Nötter',price:'',purchased:false},{id:'',name:'Utan id'},{id:'n3',name:'   '}]}});
+ assert.deepEqual(t.plan.snacks,[{id:'n1',name:'Chips',amount:'2 påsar',price:40,purchased:true},{id:'n2',name:'Nötter',amount:'',price:null,purchased:false}]);
+ assert.equal(t.cost.total,70);
+ await post('host',{action:'save',id:tid,version:t.version,title:'Tilltugg',date:'',plan:{...t.plan,snacks:[{id:'x',name:'Ost',price:-5}]}},false);
+ t=await post('host',{action:'start',id:tid});const g=await post('guest',{action:'join',id:tid,token:t.token,name:'Guest'});assert.equal(g.plan.snacks,undefined);}
+console.log('Snacks test passed');
