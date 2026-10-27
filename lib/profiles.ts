@@ -1,5 +1,6 @@
 import {drinkCategory} from '@/lib/drink-categories';
 import type {Member} from '@/lib/auth';
+import {revealDone} from '@/lib/model';
 
 // Profile pages only show ratings from revealed tastings and the imported archive,
 // the same data every member can already see in the archive. Blind tastings stay hidden.
@@ -15,7 +16,7 @@ export async function profileData(db:D1Database,id:string,viewer:Member,adminEma
  const own=id===viewer.id;
  const joined=(await db.prepare('SELECT t.id,t.title,t.date,t.status,t.owner,t.data FROM tastings t JOIN members m ON m.session=t.id WHERE m.user=? ORDER BY t.date DESC').bind(id).all()).results as any[];
  const tastings=[];
- for(const t of joined.filter(t=>t.status==='revealed')){
+ for(const t of joined.filter(t=>t.status==='revealed'&&revealDone(JSON.parse(t.data)))){
   const votes=(await db.prepare('SELECT user,sample,data FROM ratings WHERE session=?').bind(t.id).all()).results.map((v:any)=>({...v,...JSON.parse(v.data)}));
   const samples=JSON.parse(t.data).samples.map((p:any)=>{const mine=votes.find((v:any)=>v.sample===p.id&&v.user===id);return {id:p.id,number:p.number,name:p.name,type:p.type,serving:p.serving,article:p.article||'',productUrl:p.productUrl||'',price:p.price??null,volume:p.volume??null,image:p.image||'',...drinkCategory({...p,session:t.title,sessionId:t.id}),score:mine?.score??null,skip:!!mine?.skip,comment:mine?.comment||'',rated:!!mine,average:average(votes.filter((v:any)=>v.sample===p.id&&v.score!=null).map((v:any)=>v.score))};});
   tastings.push({id:t.id,title:t.title,date:t.date,source:'app',host:t.owner===id,samples});

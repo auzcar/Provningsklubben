@@ -56,4 +56,14 @@ export function systembolagetUrl(p:{productUrl?:string;article?:string;name?:str
  const q=String(p.article||'').trim()||String(p.name||'').trim();
  return q?'https://www.systembolaget.se/sok/?textQuery='+encodeURIComponent(q):'';
 }
+// The reveal is played by the host one drink at a time (plan.revealOrder from last place to the winner,
+// plan.revealAt: 0 = intro, k = k drinks shown, beyond the last = done). Until it is done the results
+// stay out of the archive and profiles, and only the drinks already shown reach the participants.
+export function revealDone(plan:any){return !Array.isArray(plan?.revealOrder)||(Number(plan.revealAt)||0)>plan.revealOrder.length;}
+export const revealDoneSql=(data='data')=>`(json_extract(${data},'$.revealOrder') IS NULL OR coalesce(json_extract(${data},'$.revealAt'),0)>json_array_length(${data},'$.revealOrder'))`;
+// Reveal order: drinks with at least one score, from the lowest average to the highest.
+export function revealOrder(samples:Sample[],votes:{sample:string;score:number|null}[]){
+ const avg=(id:string)=>{const s=votes.filter(v=>v.sample===id&&v.score!=null).map(v=>v.score as number);return s.length?s.reduce((a,b)=>a+b,0)/s.length:null;};
+ return samples.map(s=>({id:s.id,a:avg(s.id)})).filter(x=>x.a!=null).sort((x,y)=>x.a!-y.a!).map(x=>x.id);
+}
 export function visibleSamples(samples:Sample[],host:boolean,revealed:boolean){return host||revealed?samples:samples.map(s=>({id:s.id,number:s.number}));}

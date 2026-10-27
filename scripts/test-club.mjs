@@ -40,7 +40,17 @@ await post('guest',{action:'vote',id,sample:'s2',vote:{skip:true,comment:'Skippe
 await post('host',{action:'vote',id,sample:'s2',vote:{score:6}});
 await post('host',{action:'next',id},false);
 s=await post('host',{action:'reveal',id});assert.equal(s.status,'revealed');assert.equal(s.results.length,4);
-let after=await get('guest',id);assert.equal(after.plan.samples[0].name,'Secret rum');assert.equal(after.results.length,4);assert.equal(after.results.find(v=>v.name==='Guest'&&v.sample==='s1').score,0);
+// The host plays the reveal from last place to the winner; participants only get what has been shown.
+assert.deepEqual(s.reveal,{at:0,total:2,done:false,shown:['s1','s2']});
+let after=await get('guest',id);assert.deepEqual(after.reveal,{at:0,total:2,done:false,shown:[]});assert.equal(after.results.length,0);assert.equal(after.plan.samples[0].name,undefined);
+await post('guest',{action:'reveal-next',id},false);
+const histRoute=await route('history',env);const guestHist=async()=>(await histRoute.GET(new Request('https://test.local/api/history',{headers:{'oai-authenticated-user-id':'guest'}}))).status;
+assert.ok(!(await (await histRoute.GET(new Request('https://test.local/api/history',{headers:{'oai-authenticated-user-id':'stranger3'}}))).json()).sessions.some(x=>x.id===id));
+await get('stranger3',id,false);
+await post('host',{action:'reveal-next',id});after=await get('guest',id);assert.deepEqual(after.reveal.shown,['s1']);assert.equal(after.plan.samples[0].name,'Secret rum');assert.equal(after.plan.samples[1].name,undefined);assert.ok(after.results.every(v=>v.sample==='s1'));
+await post('host',{action:'reveal-next',id});await post('host',{action:'reveal-next',id});
+after=await get('guest',id);assert.equal(after.reveal.done,true);assert.equal(after.plan.samples[1].name,'Secret gin');assert.equal(after.results.length,4);assert.equal(after.results.find(v=>v.name==='Guest'&&v.sample==='s1').score,0);
+assert.equal(await guestHist(),200);await post('host',{action:'reveal-next',id},false);
 await post('guest',{action:'vote',id,sample:'s1',vote:{score:10}},false);
 await post('guest2',{action:'join',id,token:before.token,name:'Late'},false);
 await post('host',{action:'save',id,version:s.version,title:'Overwrite',date:'',plan:s.plan},false);
@@ -132,7 +142,7 @@ console.log('Calendar test passed');
  await post('host',{action:'next',id:tid}); await post('guest',{action:'vote',id:tid,sample:'v',vote:{score:7}});await post('host',{action:'vote',id:tid,sample:'v',vote:{score:8}});
  // Someone outside the tasting is not affected, and after the reveal everyone is free again.
  const hist=await route('history',env);assert.equal((await hist.GET(new Request('https://test.local/api/history',{headers:{'oai-authenticated-user-id':'stranger2'}}))).status,200);
- t=await post('host',{action:'reveal',id:tid});assert.equal(t.status,'revealed');
+ t=await post('host',{action:'reveal',id:tid});assert.equal(t.status,'revealed');await post('host',{action:'reveal-all',id:tid});
  assert.equal((await hist.GET(new Request('https://test.local/api/history',{headers:{'oai-authenticated-user-id':'guest'}}))).status,200);
  await post('host',{action:'create',title:'Fri igen'});
  // A tasting left open since an earlier day no longer locks.
@@ -172,5 +182,15 @@ console.log('Host and simulation tests passed');
  t=await post('host',{action:'next',id:tid});assert.equal(t.stage.last,true);assert.equal(t.waiting.length,3);
  await post('host',{action:'next',id:tid},false);
  for(const u of ['host','guest','late'])await post(u,{action:'vote',id:tid,sample:'d2',vote:{score:8}});
- t=await post('host',{action:'reveal',id:tid});assert.equal(t.status,'revealed');}
+ // Correcting ratings: only the host, only served drinks, only while the tasting is on.
+ assert.ok(t.ratings.some(r=>r.user==='late'&&r.sample==='d1'&&r.score===5));assert.equal((await get('guest',tid)).ratings,undefined);
+ await post('guest',{action:'rate-for',id:tid,user:'late',sample:'d1',vote:{score:9}},false);
+ t=await post('host',{action:'rate-for',id:tid,user:'late',sample:'d1',vote:{score:9}});assert.equal(t.ratings.find(r=>r.user==='late'&&r.sample==='d1').score,9);
+ await post('host',{action:'rate-for',id:tid,user:'nobody',sample:'d1',vote:{score:9}},false);
+ t=await post('host',{action:'reveal',id:tid});assert.equal(t.status,'revealed');assert.equal(t.ratings,undefined);
+ await post('host',{action:'rate-for',id:tid,user:'late',sample:'d1',vote:{score:1}},false);
+ // Everyone at the table stays in the reveal until the host has shown it all.
+ const hist=await route('history',env);const status=async u=>(await hist.GET(new Request('https://test.local/api/history',{headers:{'oai-authenticated-user-id':u}}))).status;
+ assert.equal(await status('late'),423);assert.ok((await get('late',null)).sessions.find(x=>x.id===tid).revealing);
+ await post('host',{action:'reveal-all',id:tid});assert.equal(await status('late'),200);assert.ok(!(await get('late',null)).sessions.find(x=>x.id===tid).revealing);}
 console.log('Step test passed');
