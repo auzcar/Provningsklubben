@@ -105,7 +105,7 @@ export default function TastingMode({current,onExit,onReveal,canReveal,revealHin
    </div>}
 
    {editable?<>
-    {shown===onTable&&<div className="tm-prompt"><MessageCircle size={16}/><p>{PROMPTS[(shown*5+prompt)%PROMPTS.length]}</p><button aria-label="Ny samtalsfråga" onClick={()=>setPrompt(p=>p+1)}><RefreshCw size={14}/></button></div>}
+    {shown===onTable&&<div className="tm-prompt"><MessageCircle size={16}/><p>{PROMPTS[((shown??0)*5+prompt)%PROMPTS.length]}</p><button aria-label="Ny samtalsfråga" onClick={()=>setPrompt(p=>p+1)}><RefreshCw size={14}/></button></div>}
     {shown!==onTable&&<p className="tm-latenote">Du hann inte betygsätta det här provet när det stod framme. Gör det nu, sedan låses betyget.</p>}
     <div className="tm-score-row">
      <button className="tm-step" aria-label="Sänk 0,1" disabled={vote!.skip} onClick={()=>nudge(-0.1)}>−</button>
@@ -123,7 +123,7 @@ export default function TastingMode({current,onExit,onReveal,canReveal,revealHin
    </>:<div className="tm-readonly">
     <div className="tm-kicker"><Lock size={12}/> Ditt betyg, låst</div>
     <div className="tm-score"><b>{vote!.skip?'Avstod':fmt(vote!.score)}</b>{!vote!.skip&&<small>av tio möjliga</small>}</div>
-    {vote!.tags.length>0&&<div className="tm-tags readonly">{vote!.tags.map(t=><span key={t}>{t}</span>)}</div>}
+    {vote!.tags.length>0&&<div className="tm-tags readonly">{vote!.tags.map((t:string)=><span key={t}>{t}</span>)}</div>}
     {vote!.guess!=null&&<p>Prisgissning: {vote!.guess} kr</p>}
     {vote!.comment&&<blockquote>{vote!.comment}</blockquote>}
    </div>}
