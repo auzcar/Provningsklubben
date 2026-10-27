@@ -4,7 +4,7 @@ import {card,roles,statuses,parseAvatar} from '@/lib/profiles';
 import {TEST_USERS} from '@/lib/test-users';
 export const dynamic='force-dynamic';
 async function list(r:Request){
- const me=await requireMember(r,env);const db=env.DB!;
+ const me=await requireMember(r,env,{duringTasting:true});const db=env.DB!;
  // Test users see only each other, real members never see test users.
  const rows=(await db.prepare(`SELECT * FROM profiles WHERE user ${me.tester?'':'NOT '}LIKE 'test:%' ${me.admin?'':"AND status='active'"} ORDER BY name COLLATE NOCASE`).all()).results as any[];
  const out:any={mode:authMode(env),members:rows.map(p=>card(p,me,isEnvAdmin(env,p.email)))};

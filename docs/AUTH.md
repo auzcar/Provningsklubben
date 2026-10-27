@@ -9,6 +9,7 @@
 - Administratörer: e-postadresserna i `ADMIN_EMAILS` är alltid administratörer. En administratör kan dessutom göra andra medlemmar till administratörer i appen.
 - Inaktiverade medlemmar stoppas i varje API-anrop, även om de har kvar en giltig inloggning eller en inbjudningslänk till en provning.
 - Värdskap gäller fortfarande per provning (`tastings.owner`). En delad provningslänk ger ingen åtkomst utan inloggat medlemskonto.
+- Pågående provning låser: den som är värd för eller har anslutit till en pågående provning får bara svar som rör den provningen (provningen, listan över provningar, medlemmar och profilbilder för bordet) tills resultatet avslöjats. Allt annat, som arkiv, statistik, profiler och andra provningar, svarar 423 oavsett enhet eller webbläsare. Kontrollen sitter i `requireMember`/`requireAdmin` i `lib/auth.ts`; rutter som provningen behöver anger `{duringTasting:true}`. En provning som lämnats öppen sedan före i går (svenskt datum) låser inte, och värden kan avbryta provningen från värdpanelen.
 - Undantag, godkänt av ägaren 2026-10-27: kalenderprenumerationen (`app/api/calendar`). Kalenderappar kan inte logga in, så flödet nås med en hemlig, slumpad token per medlem (tabellen `calendar_feeds`, 48 hexadecimala tecken). Flödet visar bara titel, datum, tid, plats, tema och värd för provningar där medlemmen är värd, deltar eller är inbjuden, aldrig drycker eller betyg. Inaktiverade medlemmars länkar slutar fungera, och medlemmen kan byta token under Profil → Kalender. I Sites-gatewayläget kräver gatewayen inloggning för alla adresser, så prenumerationen fungerar bara i Clerk-läget.
 
 ## Profiler
@@ -29,6 +30,7 @@ Under Medlemmar kan en administratör starta testläget. Då skapas fyra påhitt
 - Testprovningar och riktiga provningar delar aldrig deltagare: testpersoner kan inte bjudas in till eller ansluta till riktiga provningar och tvärtom.
 - Testprovningar visas inte i det riktiga arkivet, statistiken eller medlemslistan. Testpersonerna ser bara varandra.
 - Värden i en pågående testprovning kan fylla i slumpbetyg åt testdeltagarna. "Rensa testdata" tar bort testpersoner, testprovningar, deras betyg och profilbilder.
+- Provkör en riktig planering: under Planering → Översikt kan administratören kopiera sin egen provning till en testprovning ("Provkör i testläget"). Kopian får Testvärden som värd och alla testpersoner som inbjudna, och öppnas i samma flik som Testvärden. Originalet påverkas inte, och kopian försvinner med Rensa testdata.
 
 ## Sätta upp Clerk (görs av ägaren)
 

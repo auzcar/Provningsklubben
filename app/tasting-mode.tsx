@@ -1,8 +1,9 @@
 'use client';
 import {useEffect,useRef,useState} from 'react';
-import {X,ChevronLeft,ChevronRight,Check,Eye,EyeOff,Users,Copy,UserMinus,LoaderCircle,MessageCircle,RefreshCw,ArrowRight} from 'lucide-react';
+import {X,ChevronLeft,ChevronRight,Check,Eye,EyeOff,Users,Copy,UserMinus,LoaderCircle,MessageCircle,RefreshCw,ArrowRight,ClipboardList} from 'lucide-react';
 import {api} from '@/lib/client-api';
 import {TASTE_TAGS} from '@/lib/model';
+import {normalizeProgram,kindLabel} from '@/lib/program';
 import {Avatar} from './profile';
 import {SwishPay} from './swish';
 
@@ -16,7 +17,9 @@ const PROMPTS=['Vad påminner doften om? Alla säger ett ord samtidigt.','Gissa 
 
 // Full-screen blind tasting: one glass at a time, autosave, and the table in view.
 // The host scores too; the drink's identity only shows while the reveal button is held.
-export default function TastingMode({current,onExit,onReveal,canReveal,revealHint,onCopyLink,onRemove,onServe,onPaid,busy}:{current:any;onPaid:(paid:boolean)=>void;onExit:()=>void;onReveal:()=>void;canReveal:boolean;revealHint:string;onCopyLink:()=>void;onRemove:(user:string,name:string)=>void;onServe:(index:number)=>void;busy:boolean}){
+// While a tasting is on, everyone is held here (locked): no way out until the reveal, except the
+// host's option to cancel the tasting.
+export default function TastingMode({current,onExit,onReveal,canReveal,revealHint,onCopyLink,onRemove,onServe,onPaid,busy,locked=false,onCancel}:{current:any;locked?:boolean;onCancel?:()=>void;onPaid:(paid:boolean)=>void;onExit:()=>void;onReveal:()=>void;canReveal:boolean;revealHint:string;onCopyLink:()=>void;onRemove:(user:string,name:string)=>void;onServe:(index:number)=>void;busy:boolean}){
  const samples=current.plan.samples as any[];
  const [index,setIndex]=useState(()=>{const i=samples.findIndex(s=>!current.mine[s.id]);return i<0?samples.length:i;});
  const [votes,setVotes]=useState<Record<string,Draft>>(()=>Object.fromEntries(samples.map(s=>{const v=current.mine[s.id];return [s.id,v?{tags:[],guess:null,...v,state:'saved'}:{score:null,skip:false,comment:'',tags:[],guess:null,state:'empty'}];})));
@@ -26,6 +29,14 @@ export default function TastingMode({current,onExit,onReveal,canReveal,revealHin
  const completed=samples.filter(s=>done(votes[s.id])).length;
  const served:number|null=current.plan.served??null;
  const [seenServed,setSeenServed]=useState(served);
+ // The host's running order (planned under Upplägg), read-only during the tasting. "Nu" follows the
+ // glass that is on the table. Drink names and drink notes only show while a button is held.
+ const [plan,setPlan]=useState(false);const [planPeek,setPlanPeek]=useState(false);
+ const snacks=(current.plan.snacks||[]) as any[];const snackName=new Map(snacks.map(x=>[x.id,x.name]));
+ const program=current.host?normalizeProgram(current.plan.program,samples,snacks.map(x=>x.id)):[];
+ const nowAt=served==null?-1:program.findIndex(it=>it.sample===samples[served]?.id);
+ const nextItem=program[nowAt+1];
+ const itemLabel=(it:any)=>it.kind==='drink'?'Prov '+String(samples.findIndex(x=>x.id===it.sample)+1).padStart(2,'0'):(it.title||kindLabel(it.kind));
 
  useEffect(()=>{let lock:any;(navigator as any).wakeLock?.request('screen').then((l:any)=>{lock=l;}).catch(()=>{});const hide=()=>setPeek(false);document.addEventListener('visibilitychange',hide);return()=>{lock?.release?.().catch?.(()=>{});document.removeEventListener('visibilitychange',hide);};},[]);
  useEffect(()=>{api('/api/members').then(d=>setAvatars(Object.fromEntries(d.members.map((m:any)=>[m.id,m.avatar])))).catch(()=>{});},[]);
@@ -48,9 +59,9 @@ export default function TastingMode({current,onExit,onReveal,canReveal,revealHin
 
  return <div className="tasting-mode" role="dialog" aria-modal="true" aria-label={'Provningsläge: '+current.title}>
   <header className="tm-head">
-   <button className="tm-icon" aria-label="Lämna provningsläget" onClick={()=>{go(index);onExit();}}><X size={20}/></button>
+   {locked?<span className="tm-icon ghost"/>:<button className="tm-icon" aria-label="Lämna provningsläget" onClick={()=>{go(index);onExit();}}><X size={20}/></button>}
    <div className="tm-title"><span>{current.title}</span><small>{index<samples.length?`Prov ${index+1} av ${samples.length}`:'Alla prov'}</small></div>
-   {current.host?<button className="tm-icon brass" aria-label="Värdpanel" onClick={()=>setPanel(true)}><Users size={20}/></button>:<span className="tm-icon ghost"/>}
+   {current.host?<span className="row tm-host-icons"><button className="tm-icon brass" aria-label="Kvällens upplägg" onClick={()=>setPlan(true)}><ClipboardList size={20}/></button><button className="tm-icon brass" aria-label="Värdpanel" onClick={()=>setPanel(true)}><Users size={20}/></button></span>:<span className="tm-icon ghost"/>}
   </header>
 
   <section className="tm-table" aria-label="Vid bordet">
@@ -59,6 +70,8 @@ export default function TastingMode({current,onExit,onReveal,canReveal,revealHin
     <small>{p.user===current.self?'Du':p.name.split(' ')[0]}</small>
    </div>;})}
   </section>
+
+  {current.host&&nextItem&&<button className="tm-next" onClick={()=>setPlan(true)}><span><small>{nowAt<0?'Först':'Härnäst'}</small><b>{itemLabel(nextItem)}</b>{nextItem.time&&<i>kl. {nextItem.time}</i>}</span><span className="row">Upplägget <ArrowRight size={15}/></span></button>}
 
   <nav className="tm-dots" aria-label="Prov">{samples.map((s,i)=><button key={s.id} aria-label={`Prov ${i+1}${done(votes[s.id])?', betygsatt':''}${served===i?', på bordet':''}`} aria-current={i===index} className={(done(votes[s.id])?'done ':'')+(i===index?'here ':'')+(served===i?'served':'')} onClick={()=>go(i)}/>)}</nav>
 
@@ -111,6 +124,23 @@ export default function TastingMode({current,onExit,onReveal,canReveal,revealHin
    {index<samples.length&&<button className="tm-nav next" onClick={()=>go(index+1)}>{index===samples.length-1?'Klar':'Nästa prov'}<ChevronRight size={18}/></button>}
   </footer>
 
+  {plan&&current.host&&<div className="tm-sheet-backdrop" onClick={()=>{setPlan(false);setPlanPeek(false);}}>
+   <section className="tm-sheet tm-program" onClick={e=>e.stopPropagation()} aria-label="Kvällens upplägg">
+    <div className="row between"><h2>Kvällens upplägg</h2><button className="tm-icon dark" aria-label="Stäng" onClick={()=>{setPlan(false);setPlanPeek(false);}}><X size={18}/></button></div>
+    <button className="tm-peek" onPointerDown={e=>{e.currentTarget.setPointerCapture(e.pointerId);setPlanPeek(true);}} onPointerUp={()=>setPlanPeek(false)} onPointerCancel={()=>setPlanPeek(false)} onBlur={()=>setPlanPeek(false)} onKeyDown={e=>{if(e.key===' '||e.key==='Enter'){e.preventDefault();setPlanPeek(true);}}} onKeyUp={()=>setPlanPeek(false)} onContextMenu={e=>e.preventDefault()}>{planPeek?<EyeOff size={15}/>:<Eye size={15}/>}{planPeek?'Släpp för att dölja':'Håll in: visa dryckerna'}</button>
+    <ol className="tm-run">{program.map((it,i)=>{const s=it.kind==='drink'?samples.find(x=>x.id===it.sample):null;const sn=it.snacks.map(id=>snackName.get(id)).filter(Boolean);
+     return <li key={it.id} className={(i===nowAt?'now ':i===nowAt+1?'next ':i<nowAt?'past ':'')+it.kind}>
+      <span className="tm-run-time">{it.time||''}</span>
+      <div><div className="row between"><b>{itemLabel(it)}{it.kind!=='drink'&&<small> · {kindLabel(it.kind)}</small>}</b>{i===nowAt?<span className="tm-run-tag">På bordet</span>:i===nowAt+1?<span className="tm-run-tag soft">Härnäst</span>:null}</div>
+       {s&&planPeek&&<p className="tm-run-secret">{s.name}{s.serving?' · '+s.serving:''}</p>}
+       {sn.length>0&&<p>Tilltugg: {sn.join(', ')}</p>}
+       {it.notes&&(it.kind!=='drink'||planPeek)&&<p>{it.notes}</p>}
+      </div>
+     </li>;})}</ol>
+    {!program.some(it=>it.kind!=='drink')&&<p className="muted fine">Inget mer än dryckerna är planerat. Upplägget görs under Planering → Upplägg innan provningen öppnas.</p>}
+   </section>
+  </div>}
+
   {panel&&current.host&&<div className="tm-sheet-backdrop" onClick={()=>setPanel(false)}><section className="tm-sheet" onClick={e=>e.stopPropagation()} aria-label="Värdpanel">
    <div className="row between"><h2>Värdpanel</h2><button className="tm-icon dark" aria-label="Stäng" onClick={()=>setPanel(false)}><X size={18}/></button></div>
    <h3>Vem är klar?</h3>
@@ -119,6 +149,7 @@ export default function TastingMode({current,onExit,onReveal,canReveal,revealHin
    <button className="secondary full" onClick={onCopyLink}><Copy size={16}/>Kopiera länk för fler deltagare</button>
    <p className="muted fine">{revealHint}</p>
    <button className="primary full" disabled={busy||!canReveal} onClick={onReveal}>{busy?<LoaderCircle size={17} className="spin"/>:<Eye size={17}/>}Avsluta & avslöja allt</button>
+   {onCancel&&<button className="text-button danger full" disabled={busy} onClick={onCancel}>Avbryt och ta bort provningen</button>}
   </section></div>}
  </div>;
 }
