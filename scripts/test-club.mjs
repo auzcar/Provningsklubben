@@ -21,12 +21,24 @@ await post('host',{action:'reveal',id},false);
 await post('guest',{action:'vote',id,sample:'s1',vote:{score:11}},false);
 await post('guest',{action:'vote',id,sample:'wrong',vote:{score:7}},false);
 await post('stranger',{action:'vote',id,sample:'s1',vote:{score:7}},false);
+// Nothing can be rated before the host puts it on the table, and the host steps one item at a time.
+await post('guest',{action:'vote',id,sample:'s1',vote:{score:7}},false);
+await post('guest',{action:'next',id},false);
+s=await post('host',{action:'next',id});assert.deepEqual([s.stage.step,s.stage.sample,s.stage.reached],[0,0,1]);assert.deepEqual(s.waiting.sort(),['Guest','Host']);
 await post('guest',{action:'vote',id,sample:'s1',vote:{score:0,comment:'Zero is valid'}});
-await post('guest',{action:'vote',id,sample:'s2',vote:{skip:true,comment:'Skipped'}});
-let before=await get('host',id);assert.equal(before.results.length,0);assert.deepEqual(before.mine,{});
+await post('guest',{action:'vote',id,sample:'s2',vote:{skip:true}},false);
+let before=await get('host',id);assert.equal(before.results.length,0);assert.deepEqual(before.mine,{});assert.deepEqual(before.waiting,['Host']);
+assert.equal((await get('guest',id)).plan.served,0);
+// The host cannot serve the next drink until everyone has rated the one on the table.
+await post('host',{action:'next',id},false);
 await post('host',{action:'reveal',id},false);
 await post('host',{action:'vote',id,sample:'s1',vote:{score:8.12345}});
+s=await post('host',{action:'next',id});assert.equal(s.stage.sample,1);assert.equal(s.plan.served,1);
+// Earlier ratings are locked once the next drink is out.
+await post('guest',{action:'vote',id,sample:'s1',vote:{score:9}},false);
+await post('guest',{action:'vote',id,sample:'s2',vote:{skip:true,comment:'Skipped'}});
 await post('host',{action:'vote',id,sample:'s2',vote:{score:6}});
+await post('host',{action:'next',id},false);
 s=await post('host',{action:'reveal',id});assert.equal(s.status,'revealed');assert.equal(s.results.length,4);
 let after=await get('guest',id);assert.equal(after.plan.samples[0].name,'Secret rum');assert.equal(after.results.length,4);assert.equal(after.results.find(v=>v.name==='Guest'&&v.sample==='s1').score,0);
 await post('guest',{action:'vote',id,sample:'s1',vote:{score:10}},false);
@@ -117,7 +129,7 @@ console.log('Calendar test passed');
   const hist=await route('history',env);assert.equal((await hist.GET(new Request('https://test.local/api/history',{headers:{'oai-authenticated-user-id':u}}))).status,423);
   assert.equal((await get(u,tid)).id,tid);assert.ok((await get(u,null)).sessions.some(x=>x.id===tid));
   const mem=await route('members',env);assert.equal((await mem.GET(new Request('https://test.local/api/members',{headers:{'oai-authenticated-user-id':u}}))).status,200);}
- await post('guest',{action:'vote',id:tid,sample:'v',vote:{score:7}});await post('host',{action:'vote',id:tid,sample:'v',vote:{score:8}});
+ await post('host',{action:'next',id:tid}); await post('guest',{action:'vote',id:tid,sample:'v',vote:{score:7}});await post('host',{action:'vote',id:tid,sample:'v',vote:{score:8}});
  // Someone outside the tasting is not affected, and after the reveal everyone is free again.
  const hist=await route('history',env);assert.equal((await hist.GET(new Request('https://test.local/api/history',{headers:{'oai-authenticated-user-id':'stranger2'}}))).status,200);
  t=await post('host',{action:'reveal',id:tid});assert.equal(t.status,'revealed');
@@ -141,3 +153,24 @@ console.log('Calendar test passed');
  await post('host',{action:'simulate',id:src},false);// not an admin
  const other=await post('host',{action:'create',title:'Någon annans'});await call({action:'simulate',id:other.id},false);}
 console.log('Host and simulation tests passed');
+// Stepping through the evening: snacks and meals between the drinks, what participants may see,
+// a late arrival, and test mode's random scores for the others.
+{let t=await post('host',{action:'create',title:'Steg'});const tid=t.id;
+ t=await post('host',{action:'save',id:tid,version:t.version,title:'Steg',date:'',plan:{...t.plan,participants:['host','guest'],samples:[{id:'d1',name:'Hemlig 1'},{id:'d2',name:'Hemlig 2'}],snacks:[{id:'c',name:'Mörk choklad'}],
+  program:[{id:'w',kind:'snack',title:'Choklad till rommen',snacks:['c'],notes:'Värdens anteckning'},{id:'p1',kind:'drink',sample:'d1'},{id:'m',kind:'meal',title:'Middag'},{id:'p2',kind:'drink',sample:'d2'}]}});
+ t=await post('host',{action:'start',id:tid});
+ let g=await get('guest',tid);assert.equal(g.stage.step,null);assert.equal(g.stage.total,4);
+ await post('host',{action:'next',id:tid});g=await get('guest',tid);
+ assert.deepEqual([g.stage.kind,g.stage.title,g.stage.sample],['snack','Tilltugg',null]);assert.ok(!JSON.stringify(g).includes('choklad')&&!JSON.stringify(g).includes('anteckning'));
+ await post('guest',{action:'vote',id:tid,sample:'d1',vote:{score:7}},false);
+ await post('host',{action:'next',id:tid});await post('guest',{action:'vote',id:tid,sample:'d1',vote:{score:7}});await post('host',{action:'vote',id:tid,sample:'d1',vote:{score:6}});
+ t=await post('host',{action:'next',id:tid});g=await get('guest',tid);assert.deepEqual([g.stage.kind,g.stage.title,g.stage.reached,g.plan.served],['meal','Middag',1,0]);
+ // A late arrival may still give a first rating to a drink already served, but not change it afterwards.
+ await get('late',null);await post('late',{action:'join',id:tid,token:t.token,name:'Sen'});
+ await post('late',{action:'vote',id:tid,sample:'d1',vote:{score:5}});await post('late',{action:'vote',id:tid,sample:'d1',vote:{score:6}},false);
+ await post('late',{action:'vote',id:tid,sample:'d2',vote:{score:5}},false);
+ t=await post('host',{action:'next',id:tid});assert.equal(t.stage.last,true);assert.equal(t.waiting.length,3);
+ await post('host',{action:'next',id:tid},false);
+ for(const u of ['host','guest','late'])await post(u,{action:'vote',id:tid,sample:'d2',vote:{score:8}});
+ t=await post('host',{action:'reveal',id:tid});assert.equal(t.status,'revealed');}
+console.log('Step test passed');

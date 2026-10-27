@@ -43,3 +43,22 @@ export function suggestTimes(program:ProgramItem[],start:string){
  let t=Number(start.slice(0,2))*60+Number(start.slice(3,5));
  return program.map(it=>{const time=`${String(Math.floor(t/60)%24).padStart(2,'0')}:${String(t%60).padStart(2,'0')}`;t+=it.kind==='drink'?DRINK_MINUTES:KINDS.find(x=>x.kind===it.kind)!.minutes;return {...it,time};});
 }
+
+// During the tasting the host steps through the program one item at a time (plan.step, null before
+// the first). Only the drink on the table can be rated; drinks before it stay readable.
+export function stageOf(plan:{program?:any;samples:{id:string}[];snacks?:{id:string}[];step?:any}){
+ const items=normalizeProgram(plan.program,plan.samples,(plan.snacks||[]).map(s=>s.id));
+ const step=Number.isInteger(plan.step)&&plan.step>=0&&plan.step<items.length?plan.step as number:null;
+ const cur=step==null?null:items[step];
+ const sample=cur?.kind==='drink'?plan.samples.findIndex(s=>s.id===cur.sample):null;
+ const reached=step==null?0:items.slice(0,step+1).filter(i=>i.kind==='drink').length;
+ return {items,step,cur,sample,reached,last:step!=null&&step===items.length-1};
+}
+// What the participants may know about the step: the drink's number, or that a meal, break or
+// something else is on (by its title). Snacks are only "Tilltugg"; which ones, and all notes,
+// stay with the host.
+export function publicStage(plan:any){
+ const s=stageOf(plan);
+ return {step:s.step,total:s.items.length,reached:s.reached,sample:s.sample,last:s.last,kind:s.cur?.kind??null,
+  title:!s.cur||s.cur.kind==='drink'?'':s.cur.kind==='snack'?kindLabel('snack'):(s.cur.title||kindLabel(s.cur.kind))};
+}

@@ -2,6 +2,7 @@ import {env} from 'cloudflare:workers';
 import {validatePlan,validateSnacks,validateVote,visibleSamples,costShare} from '@/lib/model';
 import {requireMember,requireAdmin,reply,fail,sameOrigin,runningTastings,AuthError,LOCKED} from '@/lib/auth';
 import {isTestUser,TEST_USERS} from '@/lib/test-users';
+import {stageOf,publicStage} from '@/lib/program';
 export const dynamic='force-dynamic';
 const db=()=>{if(!env.DB)throw Error('Databasen är inte tillgänglig.');return env.DB;};
 async function detail(id:string,user:string){
@@ -12,13 +13,17 @@ async function detail(id:string,user:string){
  const plan=JSON.parse(s.data);const people=(await db().prepare('SELECT user,name,paid FROM members WHERE session=?').bind(id).all()).results;
  const mine=(await db().prepare('SELECT sample,data FROM ratings WHERE session=? AND user=?').bind(id,user).all()).results;
  const progress=(await db().prepare('SELECT user,COUNT(*) as completed FROM ratings WHERE session=? GROUP BY user').bind(id).all()).results;
+ const rated=new Set(((await db().prepare('SELECT user,sample FROM ratings WHERE session=?').bind(id).all()).results as any[]).map(x=>x.user+'\u0000'+x.sample));const all0=(u:string,sid:string)=>rated.has(u+'\u0000'+sid);
  const all=s.status==='revealed'?(await db().prepare('SELECT r.sample,r.data,m.name FROM ratings r JOIN members m ON r.session=m.session AND r.user=m.user WHERE r.session=?').bind(id).all()).results:[];
  const headcount=s.status==='draft'?(plan.participants||[]).length:people.length;
  const owner:any=await db().prepare('SELECT name,swish FROM profiles WHERE user=?').bind(s.owner).first();
  const cost=costShare(plan.samples,headcount);
+ // What is on the table, and who has not yet rated the drink there (the host waits for them).
+ const stage=publicStage(plan);let waiting:string[]=[];
+ if(s.status==='active'&&stage.sample!=null){const sid=plan.samples[stage.sample].id;waiting=(people as any[]).filter(p=>!all0(p.user,sid)).map(p=>p.name);}
  // Participants pay the host by Swish; the host sees who has marked themselves as paid.
  const pay=member&&!host&&owner?.swish?{to:owner.name,swish:owner.swish,amount:cost.perPerson&&cost.perPerson>0?cost.perPerson:null,paid:!!(member as any).paid}:undefined;
- return {id:s.id,title:s.title,date:s.date,status:s.status,version:s.version,host,self:user,joined:!!member,cost,pay,hostSwish:host?owner?.swish||'':undefined,token:host?s.token:undefined,plan:host?plan:{theme:plan.theme,time:plan.time||'',endTime:plan.endTime||'',location:plan.location||'',participants:plan.participants||[],served:plan.served??null,samples:visibleSamples(plan.samples,false,s.status==='revealed')},people:host?people:people.map(({paid,...p}:any)=>p),progress,mine:Object.fromEntries(mine.map((v:any)=>[v.sample,JSON.parse(v.data)])),results:all.map((v:any)=>({...JSON.parse(v.data),sample:v.sample,name:v.name}))};
+ return {id:s.id,title:s.title,date:s.date,status:s.status,version:s.version,host,self:user,joined:!!member,cost,pay,stage,waiting,hostSwish:host?owner?.swish||'':undefined,token:host?s.token:undefined,plan:host?plan:{theme:plan.theme,time:plan.time||'',endTime:plan.endTime||'',location:plan.location||'',participants:plan.participants||[],served:plan.served??null,samples:visibleSamples(plan.samples,false,s.status==='revealed')},people:host?people:people.map(({paid,...p}:any)=>p),progress,mine:Object.fromEntries(mine.map((v:any)=>[v.sample,JSON.parse(v.data)])),results:all.map((v:any)=>({...JSON.parse(v.data),sample:v.sample,name:v.name}))};
 }
 // During a running tasting only that tasting answers (lib/auth.ts); the list stays so the app can find it.
 async function onlyRunning(user:string,id:any){const running=await runningTastings(db(),user);if(running.length&&!running.includes(String(id||'')))throw new AuthError(LOCKED,423);}
@@ -62,6 +67,10 @@ export async function POST(r:Request){try{
  const host=s.owner===user;const plan=JSON.parse(s.data);
  if(b.action==='vote'){
  const m=await db().prepare('SELECT user FROM members WHERE session=? AND user=?').bind(id,user).first();if(!m||s.status!=='active'||!plan.samples.some((x:any)=>x.id===b.sample))throw Error('Du kan inte betygsätta detta prov nu.');
+ // Only the drink on the table can be rated. A drink served before someone joined can still get
+ // their first rating, so a late arrival does not block the reveal; after that it is read-only.
+ const st=stageOf(plan),at=plan.samples.findIndex((x:any)=>x.id===b.sample);
+ if(at!==st.sample){const mine=await db().prepare('SELECT 1 FROM ratings WHERE session=? AND user=? AND sample=?').bind(id,user,b.sample).first();if(at>=st.reached||mine)throw Error(at>=st.reached?'Provet har inte ställts fram ännu.':'Betyget är låst. Bara provet på bordet kan ändras.');}
  const v=validateVote(b.vote);
  const result=await db().prepare("INSERT INTO ratings(session,user,sample,data) SELECT ?,?,?,? WHERE EXISTS(SELECT 1 FROM tastings WHERE id=? AND status='active') ON CONFLICT(session,user,sample) DO UPDATE SET data=excluded.data").bind(id,user,b.sample,JSON.stringify(v),id).run();if(!result.meta.changes)throw Error('Provningen har avslutats.');return reply({ok:true});}
  if(b.action==='paid'){
@@ -87,15 +96,21 @@ export async function POST(r:Request){try{
  // tasting has opened, so it is saved on its own, outside the locked plan and its version.
  const {snacks,snackReceipt}=validateSnacks(b);
  await db().prepare("UPDATE tastings SET data=json_set(data,'$.snacks',json(?),'$.snackReceipt',json(?)) WHERE id=?").bind(JSON.stringify(snacks),JSON.stringify(snackReceipt),id).run();
- }else if(b.action==='serve'){
- // The host puts a glass on the table; everyone's tasting mode offers to jump there.
- const n=Number(b.sample);if(s.status!=='active'||!Number.isInteger(n)||n<0||n>=plan.samples.length)throw Error('Ogiltigt prov.');
- await db().prepare("UPDATE tastings SET data=json_set(data,'$.served',?) WHERE id=? AND status='active'").bind(n,id).run();
+ }else if(b.action==='next'){
+ // The host moves to the next item of the evening. A drink must have every participant's rating
+ // (or skip) before anything else is put out. plan.served keeps the latest drink for older clients.
+ if(s.status!=='active')throw Error('Provningen är inte pågående.');
+ const st=stageOf(plan);const to=st.step==null?0:st.step+1;if(to>=st.items.length)throw Error('Det finns inget mer att servera.');
+ if(st.sample!=null){const missing:any=await db().prepare('SELECT COUNT(*) n FROM members m WHERE m.session=? AND NOT EXISTS(SELECT 1 FROM ratings r WHERE r.session=m.session AND r.user=m.user AND r.sample=?)').bind(id,plan.samples[st.sample].id).first();if(missing.n)throw Error('Alla har inte betygsatt prov '+(st.sample+1)+' ännu.');}
+ const next=st.items[to];const served=next.kind==='drink'?plan.samples.findIndex((x:any)=>x.id===next.sample):(plan.served??null);
+ const out=await db().prepare("UPDATE tastings SET data=json_set(data,'$.step',?,'$.served',?) WHERE id=? AND status='active' AND coalesce(json_extract(data,'$.step'),-1)=?").bind(to,served,id,st.step??-1).run();
+ if(!out.meta.changes)throw Error('Någon annan hann före. Försök igen.');
  }else if(b.action==='test-fill'){
- // Test mode: random scores for every test participant who has not rated yet.
+ // Test mode: random scores on the drink on the table for every other test participant who has not rated it.
  if(!isTestUser(s.owner)||s.status!=='active')throw Error('Fungerar bara i en pågående testprovning.');
  const people=(await db().prepare('SELECT user FROM members WHERE session=?').bind(id).all()).results as any[];
- const writes=people.flatMap(p=>plan.samples.map((x:any)=>db().prepare('INSERT OR IGNORE INTO ratings(session,user,sample,data) VALUES(?,?,?,?)').bind(id,p.user,x.id,JSON.stringify({score:Math.round((4+Math.random()*5.5)*2)/2,skip:false,comment:'',tags:[],guess:null}))));
+ const st=stageOf(plan);if(st.sample==null)throw Error('Ställ fram ett prov först.');const onTable=[plan.samples[st.sample]];
+ const writes=people.filter(p=>p.user!==user).flatMap(p=>onTable.map((x:any)=>db().prepare('INSERT OR IGNORE INTO ratings(session,user,sample,data) VALUES(?,?,?,?)').bind(id,p.user,x.id,JSON.stringify({score:Math.round((4+Math.random()*5.5)*2)/2,skip:false,comment:'',tags:[],guess:null}))));
  if(writes.length)await db().batch(writes);
  }else if(b.action==='remove-participant'){
  // Someone who never showed up would otherwise block the reveal forever.
