@@ -4,7 +4,7 @@ export type Sample={id:string;name:string;article:string;type:string;price:numbe
 // not split automatically; the host may note the receipt total so it is not lost.
 export type Snack={id:string;name:string;amount:string;section:string;purchased:boolean};
 export type SnackReceipt={total:number|null;note:string};
-export type Plan={theme:string;notes:string;budget:number|null;expected:string[];participants:string[];samples:Sample[];snacks:Snack[];snackReceipt:SnackReceipt};
+export type Plan={theme:string;notes:string;time:string;endTime:string;location:string;budget:number|null;expected:string[];participants:string[];samples:Sample[];snacks:Snack[];snackReceipt:SnackReceipt};
 export type Vote={score:number|null;skip:boolean;comment:string;tags?:string[];guess?:number|null};
 // Quick tasting words shown as chips in tasting mode; counted at the reveal.
 export const TASTE_TAGS=['Fruktig','Rökig','Söt','Torr','Kryddig','Syrlig','Bitter','Blommig','Nötig','Ekig','Citrus','Mjuk'];
@@ -15,7 +15,8 @@ export function validatePlan(p:any):Plan{
  const samples=p.samples.map((s:any,i:number)=>({...s,id:text(s.id,80),name:text(s.name,200),article:text(s.article,20),type:text(s.type,200),price:num(s.price,100000),volume:num(s.volume,50000),abv:num(s.abv,100),number:i+1,purchased:!!s.purchased,serving:text(s.serving),image:/^https:\/\/product-cdn.systembolaget.se\//.test(s.image||'')?s.image:'',taste:text(s.taste),country:text(s.country,100),vintage:text(s.vintage,50),source:text(s.source,200),fetchedAt:text(s.fetchedAt,80)}));
  if(new Set(samples.map((s:Sample)=>s.id)).size!==samples.length||samples.some((s:Sample)=>!s.id||!s.name.trim()))throw Error('Varje dryck behöver ett namn och ett unikt id.');
   const {snacks,snackReceipt}=validateSnacks(p);
- return {theme:text(p.theme,100),notes:text(p.notes,5000),budget:num(p.budget,100000),expected:Array.isArray(p.expected)?p.expected.map((x:any)=>text(x,60).trim()).filter(Boolean).slice(0,40):[],participants:Array.isArray(p.participants)?[...new Set<string>(p.participants.map((x:any)=>text(x,200)).filter(Boolean))].slice(0,40):[],samples,snacks,snackReceipt};
+ const clock=(x:any)=>{const v=text(x,5).trim();if(v&&!/^([01]\d|2[0-3]):[0-5]\d$/.test(v))throw Error('Ange tiden som tt:mm, till exempel 19:00.');return v;};
+ return {theme:text(p.theme,100),notes:text(p.notes,5000),time:clock(p.time),endTime:clock(p.endTime),location:text(p.location,200).trim(),budget:num(p.budget,100000),expected:Array.isArray(p.expected)?p.expected.map((x:any)=>text(x,60).trim()).filter(Boolean).slice(0,40):[],participants:Array.isArray(p.participants)?[...new Set<string>(p.participants.map((x:any)=>text(x,200)).filter(Boolean))].slice(0,40):[],samples,snacks,snackReceipt};
 }
 // Swish numbers: private mobile (07…) or business (123…), stored as plain digits.
 export function normalizeSwish(input:any){

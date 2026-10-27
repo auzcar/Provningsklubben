@@ -50,3 +50,18 @@ console.log('PASS: authorization, no premature disclosure, draft version conflic
  t=await post('host',{action:'snacks',id:tid,snacks:[{id:'n9',name:'Vindruvor'}],snackReceipt:{total:100,note:''}});
  assert.deepEqual(t.plan.snacks,[{id:'n9',name:'Vindruvor',amount:'',section:'frukt',purchased:false}]);assert.equal(t.plan.snackReceipt.total,100);assert.equal(t.version,v);assert.equal(t.plan.samples[0].name,'Öl');}
 console.log('Snacks test passed');
+// Time and place: validated, visible to participants, and written to the calendar file.
+{let t=await post('host',{action:'create',title:'Tid'});const tid=t.id;
+ await post('host',{action:'save',id:tid,version:t.version,title:'Tid',date:'2026-11-14',plan:{...t.plan,time:'7pm'}},false);
+ t=await post('host',{action:'save',id:tid,version:t.version,title:'Tid',date:'2026-11-14',plan:{...t.plan,time:'19:00',endTime:'01:30',location:'Hemma hos Kim',samples:[{id:'z',name:'Rom'}],participants:['host','guest']}});
+ assert.equal(t.plan.time,'19:00');const list=await get('host');assert.equal(list.sessions.find(x=>x.id===tid).time,'19:00');
+ t=await post('host',{action:'start',id:tid});const g=await post('guest',{action:'join',id:tid,token:t.token,name:'Guest'});
+ assert.deepEqual([g.plan.time,g.plan.endTime,g.plan.location],['19:00','01:30','Hemma hos Kim']);
+ const {tastingIcs}=await import('../.sites-runtime/tests/lib/calendar.mjs');
+ const ics=tastingIcs({id:tid,title:'Tid, med komma',date:'2026-11-14',time:'19:00',endTime:'01:30',location:'Hemma hos Kim',version:3},'https://x/');
+ assert.match(ics,/DTSTART;TZID=Europe\/Stockholm:20261114T190000/);assert.match(ics,/DTEND;TZID=Europe\/Stockholm:20261115T013000/);
+ assert.match(ics,/BEGIN:VTIMEZONE/);assert.match(ics,/SEQUENCE:3/);assert.match(ics,/SUMMARY:Provningsklubben: Tid\\, med komma/);
+ const allDay=tastingIcs({id:'a',title:'A',date:'2026-12-31'},'https://x/');assert.match(allDay,/DTSTART;VALUE=DATE:20261231/);assert.match(allDay,/DTEND;VALUE=DATE:20270101/);assert.doesNotMatch(allDay,/VTIMEZONE/);
+ assert.match(tastingIcs({id:'b',title:'B',date:'2026-07-01',time:'23:00'},'u'),/DTEND;TZID=Europe\/Stockholm:20260702T020000/);
+ assert.ok(ics.split('\r\n').every(l=>new TextEncoder().encode(l).length<=75));}
+console.log('Time test passed');
