@@ -377,18 +377,14 @@ button.tm-guest{border:0;background:transparent;color:inherit;padding:0;font:inh
 .waiting-card{width:100%;max-width:520px;display:flex;flex-direction:column;align-items:center;gap:28px;text-align:center}
 .waiting-card .avatar{box-shadow:0 18px 50px rgb(0 0 0/.28)}
 .waiting-card h1{font-size:clamp(28px,7vw,40px);line-height:1.15;color:var(--ink);margin:0}
-/* Ordmärket: loggan bredvid namnet i appens typsnitt, med grundandeåret under. */
-.wordmark{display:flex;align-items:center;gap:12px;text-align:left;color:var(--ink)}
-.wordmark img{width:56px;height:56px;border-radius:50%;flex:none;box-shadow:0 0 0 1.5px #c9a24a8c}
-.wordmark>span{display:grid;gap:5px}
-.wordmark-name{font-family:var(--serif);font-size:23px;line-height:1;letter-spacing:-.6px}
-.wordmark-name b{font-weight:800}
-.wordmark-est{display:flex;align-items:center;gap:8px;font-family:var(--sans);font-size:10px;font-weight:600;letter-spacing:3px;opacity:.8}
-.wordmark-est::before{content:"";width:22px;height:1px;background:currentColor;opacity:.75}
 .prepared-invited{display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
-.waiting-room{flex-direction:column;padding-bottom:0;min-height:100dvh}
-.waiting-room .waiting-card{flex:1;justify-content:center;padding:16px 0;gap:24px}
-.waiting-room footer{align-self:stretch;width:100%;max-width:1100px;margin:0 auto}
+/* Väntsidan har appens toppbanner och sidfot, med innehållet centrerat mellan dem. */
+.waiting-room{flex-direction:column;align-items:stretch;padding:0;min-height:100dvh}
+.waiting-room .waiting-card{flex:1;align-self:center;justify-content:center;padding:24px 16px;gap:24px}
+.waiting-brand{display:flex;align-items:center;gap:14px;min-width:0}
+.waiting-est{display:flex;align-items:center;gap:14px;font-family:var(--sans);font-size:11px;font-weight:600;letter-spacing:3px;color:var(--muted);white-space:nowrap}
+.waiting-est::before{content:"";width:1px;height:30px;background:var(--line)}
+@media(max-width:760px){.waiting-room .brand{font-size:18px}.waiting-room .brand-logo{width:38px;height:38px}.waiting-brand,.waiting-est{gap:10px}.waiting-est{letter-spacing:2px}}
 .waiting-footer{display:flex;align-items:center;gap:16px}
 .waiting-footer>div{flex:1;min-width:0;display:flex;justify-content:space-between;gap:16px}
 .waiting-footer .icon-button{flex:none}

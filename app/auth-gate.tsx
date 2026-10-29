@@ -3,6 +3,7 @@ import {useEffect,useRef,useState} from 'react';
 import {Wine,LoaderCircle,LogOut} from 'lucide-react';
 import Club from './club';
 import {Avatar} from './profile';
+import ThemeToggle from './theme-toggle';
 import {authHeaders,loadClerk,setTokenSource,setTestUser,testUser} from '@/lib/client-auth';
 
 export type Me={id:string;name:string;admin:boolean;avatar:number;tester?:boolean};
@@ -42,10 +43,11 @@ export default function AuthGate(){
  const signOut=state.mode==='clerk'&&clerk?()=>clerk.signOut({redirectUrl:'/'}):undefined;
  if(state.phase==='ready')return <Club me={state.me||null} signOut={signOut}/>;
  // The waiting room: invited members see only this page until the admin opens the club.
- if(state.phase==='waiting'){const w=state.waiting!;return <div className="gate waiting-room"><div className="waiting-card">
+ if(state.phase==='waiting'){const w=state.waiting!;return <div className="gate waiting-room">
+  <header className="topbar"><div className="waiting-brand"><div className="brand"><img className="brand-logo" src="/logo.png" alt="" width={46} height={46}/><span>Provnings<br/><b>klubben.</b></span></div><small className="waiting-est">EST. 2019</small></div><ThemeToggle/></header>
+  <div className="waiting-card">
   <Avatar user={w.host} version={w.avatar} name={w.name} size={208}/>
   <h1>Den som väntar på nåt gott väntar aldrig för länge!</h1>
-  <div className="wordmark" role="img" aria-label="Provningsklubben, grundad 2019"><img src="/logo.png" alt="" width={56} height={56}/><span><span className="wordmark-name">Provnings<br/><b>klubben.</b></span><span className="wordmark-est">EST. 2019</span></span></div>
  </div><footer className="waiting-footer"><div>PROVNINGSKLUBBEN <span>Smaken är personlig. Minnena delar vi.</span></div>{signOut&&<button className="icon-button" aria-label="Logga ut" title="Logga ut" onClick={signOut}><LogOut size={16}/></button>}</footer></div>;}
  return <div className="gate"><div className="gate-card"><a href="/" className="brand"><img className="brand-logo" src="/logo.png" alt="" width={46} height={46}/><span>Provnings<br/><b>klubben.</b></span></a>
   {state.phase==='loading'&&<div className="loading"><LoaderCircle className="spin"/>Hämtar klubben…</div>}
