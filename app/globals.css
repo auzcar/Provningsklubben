@@ -379,3 +379,6 @@ button.tm-guest{border:0;background:transparent;color:inherit;padding:0;font:inh
 .waiting-card h1{font-size:clamp(28px,7vw,40px);line-height:1.15;color:var(--ink);margin:0}
 .waiting-logo{width:112px;height:112px;border-radius:50%;box-shadow:0 0 0 1px #c9a24a55}
 .prepared-invited{display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
+.waiting-room{flex-direction:column;padding-bottom:0}
+.waiting-room .waiting-card{flex:1;justify-content:center;padding:24px 0}
+.waiting-room footer{align-self:stretch;width:100%;max-width:1100px;margin:0 auto}
