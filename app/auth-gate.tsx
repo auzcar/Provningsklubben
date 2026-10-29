@@ -45,7 +45,7 @@ export default function AuthGate(){
  if(state.phase==='waiting'){const w=state.waiting!;return <div className="gate waiting-room"><div className="waiting-card">
   <Avatar user={w.host} version={w.avatar} name={w.name} size={208}/>
   <h1>Den som väntar på nåt gott väntar aldrig för länge!</h1>
-  <img className="waiting-logo" src="/logo.png" alt="Provningsklubben" width={112} height={112}/>
+  <div className="wordmark" role="img" aria-label="Provningsklubben, grundad 2019"><img src="/logo.png" alt="" width={92} height={92}/><span><span className="wordmark-name">Provnings<br/><b>klubben.</b></span><span className="wordmark-est">EST. 2019</span></span></div>
   {signOut&&<button className="secondary" onClick={signOut}>Logga ut</button>}
  </div><footer>PROVNINGSKLUBBEN <span>Smaken är personlig. Minnena delar vi.</span></footer></div>;}
  return <div className="gate"><div className="gate-card"><a href="/" className="brand"><img className="brand-logo" src="/logo.png" alt="" width={46} height={46}/><span>Provnings<br/><b>klubben.</b></span></a>
