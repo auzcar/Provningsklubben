@@ -378,3 +378,4 @@ button.tm-guest{border:0;background:transparent;color:inherit;padding:0;font:inh
 .waiting-card .avatar{box-shadow:0 18px 50px rgb(0 0 0/.28)}
 .waiting-card h1{font-size:clamp(28px,7vw,40px);line-height:1.15;color:var(--ink);margin:0}
 .waiting-logo{width:112px;height:112px;border-radius:50%;box-shadow:0 0 0 1px #c9a24a55}
+.prepared-invited{display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
