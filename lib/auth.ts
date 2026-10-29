@@ -81,8 +81,20 @@ export async function runningTastings(db:D1Database,user:string){
  const rows=(await db.prepare("SELECT t.id FROM tastings t WHERE (t.status='active' OR (t.status='revealed' AND "+eveningOpenSql('t.data')+")) AND (t.date='' OR t.date>=?) AND (t.owner=? OR EXISTS(SELECT 1 FROM members m WHERE m.session=t.id AND m.user=?))").bind(yesterday,user,user).all()).results as any[];
  return rows.map(x=>String(x.id));
 }
-type Guard={ignoreTest?:boolean;duringTasting?:boolean};
-async function notInTasting(env:AuthEnv,m:Member,opts:Guard){if(!opts.duringTasting&&env.DB&&(await runningTastings(env.DB,m.id)).length)throw new AuthError(LOCKED,423);return m;}
+// Waiting room (settings key waiting_room): while an admin has it on, members who are not admins
+// reach nothing but the waiting page, which shows that admin's photo. Test users are not held back.
+export const WAITING='Klubben har inte öppnat ännu.';
+export async function waitingRoom(db:D1Database){
+ const w:any=await db.prepare("SELECT s.value host,p.name,p.avatar_version avatar FROM settings s LEFT JOIN profiles p ON p.user=s.value WHERE s.key='waiting_room'").first();
+ return w?{host:String(w.host),name:String(w.name||''),avatar:Number(w.avatar||0)}:null;
+}
+export const waits=(m:Member)=>!m.admin&&!m.tester;
+// waiting: the route serves the waiting page itself (session, the host's photo).
+type Guard={ignoreTest?:boolean;duringTasting?:boolean;waiting?:boolean};
+async function notInTasting(env:AuthEnv,m:Member,opts:Guard){
+ if(!opts.waiting&&waits(m)&&env.DB&&await waitingRoom(env.DB))throw new AuthError(WAITING,403);
+ if(!opts.duringTasting&&env.DB&&(await runningTastings(env.DB,m.id)).length)throw new AuthError(LOCKED,423);return m;
+}
 export async function requireMember(r:Request,env:AuthEnv,opts:Guard={}){const m=await findMember(r,env,opts);if(!m)throw new AuthError(SIGNED_OUT);return notInTasting(env,m,opts);}
 export async function requireAdmin(r:Request,env:AuthEnv,opts:Guard={}){const m=await findMember(r,env,opts);if(!m)throw new AuthError(SIGNED_OUT);if(!m.admin)throw new AuthError('Endast administratören kan göra detta.',403);return notInTasting(env,m,opts);}
 

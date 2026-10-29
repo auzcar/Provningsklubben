@@ -372,3 +372,9 @@ button.tm-guest{border:0;background:transparent;color:inherit;padding:0;font:inh
 /* The reveal, results and bottles in tasting mode until the host ends the evening (app/club.tsx) */
 .finale-body{flex:1;width:100%;max-width:900px;margin:0 auto;padding:10px 16px 20px;box-sizing:border-box}
 .finale .reveal-show{min-height:calc(100vh - 160px)}
+
+/* Väntrummet: det enda inbjudna medlemmar ser tills administratören öppnar klubben. */
+.waiting-card{width:100%;max-width:520px;display:flex;flex-direction:column;align-items:center;gap:28px;text-align:center}
+.waiting-card .avatar{box-shadow:0 18px 50px rgb(0 0 0/.28)}
+.waiting-card h1{font-size:clamp(28px,7vw,40px);line-height:1.15;color:var(--ink);margin:0}
+.waiting-logo{width:112px;height:112px;border-radius:50%;box-shadow:0 0 0 1px #c9a24a55}

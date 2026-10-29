@@ -2,10 +2,12 @@
 import {useEffect,useRef,useState} from 'react';
 import {Wine,LoaderCircle} from 'lucide-react';
 import Club from './club';
+import {Avatar} from './profile';
 import {authHeaders,loadClerk,setTokenSource,setTestUser,testUser} from '@/lib/client-auth';
 
 export type Me={id:string;name:string;admin:boolean;avatar:number;tester?:boolean};
-type State={phase:'loading'|'signin'|'blocked'|'ready'|'error';mode?:string;me?:Me|null;message?:string};
+type Waiting={host:string;name:string;avatar:number};
+type State={phase:'loading'|'signin'|'blocked'|'waiting'|'ready'|'error';mode?:string;me?:Me|null;message?:string;waiting?:Waiting};
 
 async function session():Promise<any>{
  const r=await fetch('/api/session',{headers:await authHeaders(),cache:'no-store'});const d={status:r.status,...(await r.json() as object)};
@@ -20,7 +22,7 @@ if(typeof window!=='undefined'){const u=new URL(location.href),t=u.searchParams.
 // accepts the token. Sign-up only works through an invitation link (Restricted mode in Clerk).
 export default function AuthGate(){
  const [state,setState]=useState<State>({phase:'loading'});const [clerk,setClerk]=useState<any>(null);const mount=useRef<HTMLDivElement>(null);
- const check=async()=>{const s=await session();if(s.me)setState({phase:'ready',mode:s.auth.mode,me:s.me});else if(s.status===403)setState({phase:'blocked',mode:s.auth.mode,message:s.error});else if(s.auth.mode==='clerk')setState({phase:'signin',mode:'clerk'});else setState({phase:'ready',mode:s.auth.mode,me:null});};
+ const check=async()=>{const s=await session();if(s.me&&s.waiting)setState({phase:'waiting',mode:s.auth.mode,me:s.me,waiting:s.waiting});else if(s.me)setState({phase:'ready',mode:s.auth.mode,me:s.me});else if(s.status===403)setState({phase:'blocked',mode:s.auth.mode,message:s.error});else if(s.auth.mode==='clerk')setState({phase:'signin',mode:'clerk'});else setState({phase:'ready',mode:s.auth.mode,me:null});};
  useEffect(()=>{(async()=>{
   const first=await session();
   if(first.auth.mode!=='clerk')return check();
@@ -39,6 +41,13 @@ export default function AuthGate(){
  },[state.phase,clerk]);
  const signOut=state.mode==='clerk'&&clerk?()=>clerk.signOut({redirectUrl:'/'}):undefined;
  if(state.phase==='ready')return <Club me={state.me||null} signOut={signOut}/>;
+ // The waiting room: invited members see only this page until the admin opens the club.
+ if(state.phase==='waiting'){const w=state.waiting!;return <div className="gate waiting-room"><div className="waiting-card">
+  <Avatar user={w.host} version={w.avatar} name={w.name} size={208}/>
+  <h1>Den som väntar på nåt gott väntar aldrig för länge!</h1>
+  <img className="waiting-logo" src="/logo.png" alt="Provningsklubben" width={112} height={112}/>
+  {signOut&&<button className="text-button" onClick={signOut}>Logga ut</button>}
+ </div></div>;}
  return <div className="gate"><div className="gate-card"><a href="/" className="brand"><img className="brand-logo" src="/logo.png" alt="" width={46} height={46}/><span>Provnings<br/><b>klubben.</b></span></a>
   {state.phase==='loading'&&<div className="loading"><LoaderCircle className="spin"/>Hämtar klubben…</div>}
   {state.phase==='signin'&&<><div className="eyebrow">ENDAST FÖR MEDLEMMAR</div><h1>Välkommen in</h1><p className="intro">Logga in med kontot du fick inbjudan till. Nya medlemmar bjuds in av klubbens administratör.</p><div ref={mount} className="clerk-mount"/></>}

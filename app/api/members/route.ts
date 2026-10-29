@@ -1,5 +1,5 @@
 import {env} from 'cloudflare:workers';
-import {requireMember,requireAdmin,reply,fail,sameOrigin,authMode,clerkClient,isEnvAdmin} from '@/lib/auth';
+import {requireMember,requireAdmin,reply,fail,sameOrigin,authMode,clerkClient,isEnvAdmin,waitingRoom} from '@/lib/auth';
 import {card,roles,statuses,parseAvatar} from '@/lib/profiles';
 import {TEST_USERS} from '@/lib/test-users';
 export const dynamic='force-dynamic';
@@ -9,6 +9,7 @@ async function list(r:Request){
  const rows=(await db.prepare(`SELECT * FROM profiles WHERE user ${me.tester?'':'NOT '}LIKE 'test:%' ${me.admin?'':"AND status='active'"} ORDER BY name COLLATE NOCASE`).all()).results as any[];
  const out:any={mode:authMode(env),members:rows.map(p=>card(p,me,isEnvAdmin(env,p.email)))};
  if(me.admin){
+  out.waitingRoom=await waitingRoom(db);
   // Participant names used in the imported archive, so the admin can link them to members.
   out.archiveNames=[...new Set((await db.prepare('SELECT data FROM historical').all()).results.flatMap((h:any)=>JSON.parse(h.data).samples.flatMap((p:any)=>(p.ratings||[]).map((v:any)=>v.name))))].filter(Boolean).sort();
   // Prepared members (lib/pending.ts), with the photo as a data URL for the preview.
@@ -48,6 +49,10 @@ export async function POST(r:Request){try{
   const old:any=await db.prepare('SELECT mime,avatar FROM pending_profiles WHERE email=?').bind(previous).first();
   const photo=b.image?parseAvatar(b.image):b.keepPhoto&&old?.avatar?{mime:old.mime,data:old.avatar}:{mime:'',data:''};
   await db.batch([...(previous!==email?[db.prepare('DELETE FROM pending_profiles WHERE email=?').bind(previous)]:[]),db.prepare('INSERT INTO pending_profiles(email,name,history_names,mime,avatar,created_at) VALUES(?,?,?,?,?,?) ON CONFLICT(email) DO UPDATE SET name=excluded.name,history_names=excluded.history_names,mime=excluded.mime,avatar=excluded.avatar').bind(email,name,history,photo.mime,photo.data,new Date().toISOString())]);
+ }else if(b.action==='waiting-room'){
+  // On: members who are not admins see only the waiting page, with this admin's photo.
+  if(b.on)await db.prepare("INSERT INTO settings(key,value) VALUES('waiting_room',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind(me.id).run();
+  else await db.prepare("DELETE FROM settings WHERE key='waiting_room'").run();
  }else if(b.action==='unprepare'){
   await db.prepare('DELETE FROM pending_profiles WHERE email=?').bind(String(b.email||'').trim().toLowerCase()).run();
  }else if(b.action==='update'){
