@@ -46,7 +46,7 @@ export default function AuthGate(){
   <Avatar user={w.host} version={w.avatar} name={w.name} size={208}/>
   <h1>Den som väntar på nåt gott väntar aldrig för länge!</h1>
   <img className="waiting-logo" src="/logo.png" alt="Provningsklubben" width={112} height={112}/>
-  {signOut&&<button className="text-button" onClick={signOut}>Logga ut</button>}
+  {signOut&&<button className="secondary" onClick={signOut}>Logga ut</button>}
  </div></div>;}
  return <div className="gate"><div className="gate-card"><a href="/" className="brand"><img className="brand-logo" src="/logo.png" alt="" width={46} height={46}/><span>Provnings<br/><b>klubben.</b></span></a>
   {state.phase==='loading'&&<div className="loading"><LoaderCircle className="spin"/>Hämtar klubben…</div>}
