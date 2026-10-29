@@ -16,3 +16,6 @@ export const pendingProfiles=sqliteTable('pending_profiles',{email:text('email')
 // Personal calendar subscription: a secret token per member for the feed at /api/calendar?feed=…
 // (calendar apps cannot sign in). Replacing the token stops the old link.
 export const calendarFeeds=sqliteTable('calendar_feeds',{user:text('user').primaryKey(),token:text('token').notNull().unique(),createdAt:text('created_at').notNull()});
+// Club-wide settings set by an admin. `waiting_room` holds the id of the admin who turned the
+// waiting room on: until it is turned off, members who are not admins only see the waiting page.
+export const settings=sqliteTable('settings',{key:text('key').primaryKey(),value:text('value').notNull()});

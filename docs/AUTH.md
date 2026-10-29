@@ -12,6 +12,10 @@
 - Pågående provning låser: den som är värd för eller har anslutit till en pågående provning får bara svar som rör den provningen (provningen, listan över provningar, medlemmar och profilbilder för bordet) tills resultatet avslöjats. Allt annat, som arkiv, statistik, profiler och andra provningar, svarar 423 oavsett enhet eller webbläsare. Kontrollen sitter i `requireMember`/`requireAdmin` i `lib/auth.ts`; rutter som provningen behöver anger `{duringTasting:true}`. En provning som lämnats öppen sedan före i går (svenskt datum) låser inte, och värden kan avbryta provningen från värdpanelen.
 - Undantag, godkänt av ägaren 2026-10-27: kalenderprenumerationen (`app/api/calendar`). Kalenderappar kan inte logga in, så flödet nås med en hemlig, slumpad token per medlem (tabellen `calendar_feeds`, 48 hexadecimala tecken). Flödet visar bara titel, datum, tid, plats, tema och värd för provningar där medlemmen är värd, deltar eller är inbjuden, aldrig drycker eller betyg. Inaktiverade medlemmars länkar slutar fungera, och medlemmen kan byta token under Profil → Kalender. I Sites-gatewayläget kräver gatewayen inloggning för alla adresser, så prenumerationen fungerar bara i Clerk-läget.
 
+## Väntrum
+
+Under Medlemmar → Väntrum kan en administratör sätta på väntrummet för att bjuda in medlemmar i förväg utan att släppa in dem. Medan det är på ser alla som inte är administratörer bara en väntsida: profilbilden för administratören som satte på det, texten "Den som väntar på nåt gott väntar aldrig för länge!" och loggan. Spärren sitter på servern i `requireMember`/`requireAdmin` (`lib/auth.ts`): alla andra API-anrop svarar 403, och `/api/avatar` lämnar bara ut den administratörens bild. Testpersoner i testläget påverkas inte. Inställningen ligger i tabellen `settings` (nyckeln `waiting_room`, värdet är administratörens id). "Öppna klubben" tar bort den.
+
 ## Profiler
 
 - Namn, beskrivning och profilbild. Bilden beskärs och förminskas i webbläsaren och lagras i D1-tabellen `avatars` (högst 300 kB, JPEG/PNG/WebP, kontrolleras på servern). Bilden visas bara för inloggade medlemmar.

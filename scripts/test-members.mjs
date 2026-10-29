@@ -215,6 +215,20 @@ let fp=await call(profile,'friend','/api/profile?user=friend');assert.deepEqual(
 assert.equal((await call(members,'boss','/api/members')).prepared.length,0);
 s=await call(session,'friend','/api/session');assert.equal(s.me.name,'Kompisen K');
 
+// Waiting room: members who are not admins reach only the waiting page and the photo of the admin who turned it on.
+await call(members,'guest','/api/members',{action:'waiting-room',on:true},403);
+await call(profile,'boss','/api/profile',{action:'avatar',image:png});
+list=await call(members,'boss','/api/members',{action:'waiting-room',on:true});assert.equal(list.waitingRoom.host,'boss');
+s=await call(session,'guest','/api/session');assert.equal(s.me.id,'guest');assert.equal(s.waiting.host,'boss');assert.ok(s.waiting.avatar>0);
+s=await call(session,'boss','/api/session');assert.equal(s.waiting,null);await call(club,'boss','/api/club');
+await call(club,'guest','/api/club',undefined,403);await call(members,'guest','/api/members',undefined,403);await call(profile,'guest','/api/profile',undefined,403);await call(history,'guest','/api/history',undefined,403);await call(shop,'guest','/api/shopping',undefined,403);
+await call(club,'newcomer','/api/club',undefined,403);assert.equal((await call(session,'newcomer','/api/session')).waiting.host,'boss');
+img=await call(avatar,'guest','/api/avatar?user=boss');assert.equal(img.headers.get('content-type'),'image/png');
+await call(avatar,'guest','/api/avatar?user=guest',undefined,403);
+await call(members,'boss','/api/members',{action:'test-setup'});await call(club,'boss','/api/club',undefined,200,{'X-Test-User':'test:1'});await call(members,'boss','/api/members',{action:'test-reset'});
+list=await call(members,'boss','/api/members',{action:'waiting-room',on:false});assert.equal(list.waitingRoom,null);
+assert.equal((await call(session,'guest','/api/session')).waiting,null);await call(club,'guest','/api/club');await call(members,'boss','/api/members',{action:'update',user:'newcomer',status:'removed'});
+
 // Clerk mode: identity headers are ignored; only a valid session token for this origin counts.
 const {privateKey,publicKey}=generateKeyPairSync('rsa',{modulusLength:2048});
 const jwtKey=publicKey.export({type:'spki',format:'pem'}).toString();
@@ -230,4 +244,4 @@ await call(club,null,'/api/club',undefined,401,{Authorization:'Bearer '+token({a
 await call(club,null,'/api/club',undefined,401,{Authorization:'Bearer '+token({exp:Math.floor(Date.now()/1000)-120})});
 await call(club,null,'/api/club',undefined,401,{Authorization:'Bearer '+token().slice(0,-4)+'AAAA'});
 await call(club,null,'/api/club',undefined,200,{Authorization:'Bearer '+token()});
-console.log('PASS: membership, admin rules, removal, profiles without premature disclosure, archive linking, avatar validation, participants, cost split, Swish, deletion, backup import, admin test mode isolation, full backup and restore, admin removal of revealed tastings, admin archive editing, synced shopping list, prepared members, Clerk token verification.');
+console.log('PASS: membership, admin rules, removal, profiles without premature disclosure, archive linking, avatar validation, participants, cost split, Swish, deletion, backup import, admin test mode isolation, full backup and restore, admin removal of revealed tastings, admin archive editing, synced shopping list, prepared members, waiting room, Clerk token verification.');

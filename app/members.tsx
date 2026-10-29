@@ -1,6 +1,6 @@
 'use client';
 import {useEffect,useState} from 'react';
-import {Mail,LoaderCircle,X,ShieldCheck,UserX,UserCheck,Link2,ChevronRight,Upload} from 'lucide-react';
+import {Mail,LoaderCircle,X,ShieldCheck,UserX,UserCheck,Link2,ChevronRight,Upload,Hourglass,DoorOpen} from 'lucide-react';
 import {api} from '@/lib/client-api';
 import {Avatar} from './profile';
 import type {Me} from './auth-gate';
@@ -22,6 +22,10 @@ export default function Members({me,openProfile}:{me:Me;openProfile:(id:string)=
    {data.mode==='clerk'?<><form className="row invite-form" onSubmit={async e=>{e.preventDefault();if(await run({action:'invite',email},'Inbjudan skickad till '+email+'.'))setEmail('');}}><input type="email" required placeholder="namn@exempel.se" aria-label="E-postadress" value={email} onChange={e=>setEmail(e.target.value)}/><button className="primary" disabled={busy}><Mail size={16}/>Skicka inbjudan</button></form><p className="muted fine">Mottagaren får ett mejl med en personlig länk för att skapa sitt konto. Den som inte är inbjuden kan inte registrera sig.</p>
     {data.invitations?.length>0&&<div className="invites"><h3>Väntande inbjudningar</h3>{data.invitations.map((i:any)=><div className="row between invite" key={i.id}><span>{i.email}</span><button className="text-button" disabled={busy} onClick={()=>run({action:'revoke-invite',id:i.id},'Inbjudan återkallad.')}><X size={14}/>Återkalla</button></div>)}</div>}</>
    :<p className="muted">Inbjudningar hanteras av den nuvarande inloggningstjänsten. Med Clerk-inloggning (AUTH_MODE=clerk) skickar du inbjudningar här.</p>}
+  </section>}
+  {me.admin&&<section className="panel"><div className="eyebrow">ADMINISTRATION</div><h2>Väntrum</h2>
+   {data.waitingRoom?<><p className="muted fine">Väntrummet är på. Medlemmar som inte är administratörer ser bara en sida med {data.waitingRoom.host===me.id?'din':data.waitingRoom.name+'s'} profilbild, texten ”Den som väntar på nåt gott väntar aldrig för länge!” och loggan. Inget annat i klubben går att nå.</p><button className="primary" disabled={busy} onClick={()=>confirm('Öppna klubben för alla medlemmar?')&&run({action:'waiting-room',on:false},'Klubben är öppen för alla medlemmar.')}><DoorOpen size={16}/>Öppna klubben</button></>
+   :<><p className="muted fine">Bjud in medlemmar i förväg utan att släppa in dem. Med väntrummet på ser alla som inte är administratörer bara en väntsida med din profilbild, tills du öppnar klubben.</p><button className="secondary" disabled={busy} onClick={()=>run({action:'waiting-room',on:true},'Väntrummet är på.')}><Hourglass size={16}/>Sätt på väntrummet</button></>}
   </section>}
   <div className="member-grid">{active.map((m:any)=><article className="member-card" key={m.id}>
    <button className="member-main" onClick={()=>openProfile(m.id)}><Avatar user={m.id} version={m.avatar} name={m.name} size={52}/><span className="member-name"><strong>{m.name}</strong><small>{m.admin?'Administratör':'Medlem'}{m.id===me.id?' · du':''}</small>{me.admin&&m.email&&<small>{m.email}</small>}</span><ChevronRight size={16}/></button>
