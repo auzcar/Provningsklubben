@@ -1,12 +1,13 @@
 'use client';
 import {useEffect,useRef,useState} from 'react';
-import {Camera,Trash2,Pencil,LoaderCircle,ChevronRight,Star,CalendarDays,LogOut} from 'lucide-react';
+import {Camera,Trash2,Pencil,LoaderCircle,ChevronRight,Star,CalendarDays,LogOut,Move} from 'lucide-react';
 import {api} from '@/lib/client-api';
 import {authHeaders} from '@/lib/client-auth';
 import type {Me} from './auth-gate';
 import SbLink from './sb-link';
 import MyRatings from './my-ratings';
 import CalendarSubscribe from './calendar-subscribe';
+import PhotoCrop from './photo-crop';
 
 const fmt=(n:any,d=2)=>n==null?'–':Number(n).toLocaleString('sv-SE',{maximumFractionDigits:d});
 const statusName:any={draft:'Planering',active:'Pågår',revealed:'Avslöjad'};
@@ -26,26 +27,19 @@ export function Avatar({user,version,name,size=44}:{user:string;version:number;n
  return <span className="avatar" style={{width:size,height:size,fontSize:size*.38}} aria-hidden="true">{src?<img src={src} alt=""/>:initials}</span>;
 }
 
-// Crop to a square and shrink in the browser so uploads stay small.
-export async function resize(file:File){
- if(!file.type.startsWith('image/'))throw Error('Välj en bildfil.');
- const bitmap=await createImageBitmap(file);const side=Math.min(bitmap.width,bitmap.height),out=320;
- const canvas=document.createElement('canvas');canvas.width=canvas.height=out;
- canvas.getContext('2d')!.drawImage(bitmap,(bitmap.width-side)/2,(bitmap.height-side)/2,side,side,0,0,out,out);
- return canvas.toDataURL('image/jpeg',.85);
-}
-
 export function Profile({user,me,openTasting,onSaved,signOut}:{user:string;me:Me;openTasting:(id:string)=>void;onSaved:(p:any)=>void;signOut?:()=>void}){
- const [data,setData]=useState<any>(null);const [error,setError]=useState('');const [editing,setEditing]=useState(false);const [name,setName]=useState('');const [bio,setBio]=useState('');const [swish,setSwish]=useState('');const [busy,setBusy]=useState(false);const [expanded,setExpanded]=useState('');const file=useRef<HTMLInputElement>(null);
+ const [data,setData]=useState<any>(null);const [error,setError]=useState('');const [editing,setEditing]=useState(false);const [name,setName]=useState('');const [bio,setBio]=useState('');const [swish,setSwish]=useState('');const [busy,setBusy]=useState(false);const [expanded,setExpanded]=useState('');const [crop,setCrop]=useState<Blob|null>(null);const file=useRef<HTMLInputElement>(null);
  useEffect(()=>{api('/api/profile?user='+encodeURIComponent(user)).then(setData).catch(e=>setError(e.message));},[user]);
- const save=async(body:any)=>{setBusy(true);setError('');try{const d=await api('/api/profile',body);setData(d);setEditing(false);onSaved(d.profile);}catch(e:any){setError(e.message);}finally{setBusy(false);}};
- const upload=async(f?:File)=>{if(!f)return;try{await save({action:'avatar',image:await resize(f)});}catch(e:any){setError(e.message);}finally{if(file.current)file.current.value='';}};
+ const save=async(body:any)=>{setBusy(true);setError('');try{const d=await api('/api/profile',body);setData(d);setEditing(false);onSaved(d.profile);return true;}catch(e:any){setError(e.message);return false;}finally{setBusy(false);}};
+ // A new photo, or the current one, opens in the crop dialog before it is saved.
+ const upload=(f?:File)=>{if(file.current)file.current.value='';if(!f)return;if(!f.type.startsWith('image/'))return setError('Välj en bildfil.');setError('');setCrop(f);};
+ const adjust=async(p:any)=>{try{const src=await avatarUrl(p.id,p.avatar);if(!src)throw Error('Bilden gick inte att hämta.');setCrop(await (await fetch(src)).blob());}catch(e:any){setError(e.message);}};
  if(error&&!data)return <div className="empty"><h3>{error}</h3></div>;
  if(!data)return <div className="loading"><LoaderCircle className="spin"/>Hämtar profilen…</div>;
  const p=data.profile;
  return <>
   <section className="profile-head">
-   <div className="profile-photo"><Avatar user={p.id} version={p.avatar} name={p.name} size={112}/>{p.own&&<div className="row photo-actions"><button className="text-button" disabled={busy} onClick={()=>file.current?.click()}><Camera size={14}/>{p.avatar?'Byt bild':'Lägg till bild'}</button>{p.avatar>0&&<button className="text-button" disabled={busy} onClick={()=>save({action:'remove-avatar'})}><Trash2 size={14}/>Ta bort</button>}<input ref={file} type="file" accept="image/*" hidden onChange={e=>upload(e.target.files?.[0])}/></div>}</div>
+   <div className="profile-photo"><Avatar user={p.id} version={p.avatar} name={p.name} size={112}/>{p.own&&<div className="row photo-actions"><button className="text-button" disabled={busy} onClick={()=>file.current?.click()}><Camera size={14}/>{p.avatar?'Byt bild':'Lägg till bild'}</button>{p.avatar>0&&<button className="text-button" disabled={busy} onClick={()=>adjust(p)}><Move size={14}/>Justera</button>}{p.avatar>0&&<button className="text-button" disabled={busy} onClick={()=>save({action:'remove-avatar'})}><Trash2 size={14}/>Ta bort</button>}<input ref={file} type="file" accept="image/*" hidden onChange={e=>upload(e.target.files?.[0])}/></div>}</div>
    <div className="profile-text">
     <div className="eyebrow">{p.admin?'ADMINISTRATÖR':'MEDLEM'}{p.own?' · DIN PROFIL':''}</div>
     {editing?<div className="profile-edit"><label className="field"><span>Namn</span><input value={name} maxLength={60} onChange={e=>setName(e.target.value)}/></label><label className="field"><span>Om mig</span><textarea rows={3} maxLength={600} value={bio} placeholder="Favoritdrycker, smakpreferenser…" onChange={e=>setBio(e.target.value)}/></label><label className="field"><span>Swishnummer</span><input inputMode="tel" value={swish} placeholder="070-123 45 67" onChange={e=>setSwish(e.target.value)}/><small className="muted">Visas bara för deltagarna i provningar där du är värd, så att de kan swisha sin andel.</small></label><div className="row"><button className="primary small" disabled={busy} onClick={()=>save({action:'update',name,bio,swish})}>Spara</button><button className="secondary small" onClick={()=>setEditing(false)}>Avbryt</button></div></div>
@@ -53,6 +47,7 @@ export function Profile({user,me,openTasting,onSaved,signOut}:{user:string;me:Me
     {error&&<p className="inline-error">{error}</p>}
    </div>
   </section>
+  {crop&&<PhotoCrop source={crop} busy={busy} onCancel={()=>setCrop(null)} onDone={async image=>{if(await save({action:'avatar',image}))setCrop(null);}}/>}
   <section className="stats"><div><span className="stat-number">{data.stats.tastings}</span><p>provningar</p></div><div><span className="stat-number">{data.stats.ratings}</span><p>betygsatta drycker</p></div><div><span className="stat-number">{fmt(data.stats.average,1)}</span><p>snittbetyg</p></div></section>
   {p.own&&!me.tester&&<CalendarSubscribe/>}
   {data.upcoming.length>0&&<section className="profile-section"><div className="section-head"><div><div className="eyebrow">PÅ GÅNG</div><h2>Dina kommande provningar</h2></div></div><div className="session-grid">{data.upcoming.map((s:any)=><button className="session-card" key={s.id} onClick={()=>openTasting(s.id)}><span className={'badge '+s.status}>{statusName[s.status]}</span><h3>{s.title}</h3><p><CalendarDays size={15}/>{s.date||'Datum inte bestämt'}</p></button>)}</div><p className="muted fine">Betyg från pågående provningar syns först när provningen avslöjas.</p></section>}

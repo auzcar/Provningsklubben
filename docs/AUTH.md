@@ -18,7 +18,7 @@ Under Medlemmar → Väntrum kan en administratör sätta på väntrummet för a
 
 ## Profiler
 
-- Namn, beskrivning och profilbild. Bilden beskärs och förminskas i webbläsaren och lagras i D1-tabellen `avatars` (högst 300 kB, JPEG/PNG/WebP, kontrolleras på servern). Bilden visas bara för inloggade medlemmar.
+- Namn, beskrivning och profilbild. Medlemmen flyttar, zoomar och centrerar bilden i en bildredigerare (`app/photo-crop.tsx`, även under Förbered medlemmar). Bilden beskärs och förminskas i webbläsaren och lagras i D1-tabellen `avatars` (högst 300 kB, JPEG/PNG/WebP, kontrolleras på servern). Bilden visas bara för inloggade medlemmar.
 - Profilen visar provningar och betyg från **avslöjade** provningar och från det importerade arkivet. Betyg i pågående provningar visas aldrig, inte heller på den egna profilen.
 - Det importerade arkivet innehåller bara deltagarnamn, inga konton. Administratören kopplar arkivnamn till en medlem under Medlemmar → Koppla arkivnamn.
 
