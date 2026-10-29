@@ -24,7 +24,7 @@ Under Medlemmar → Väntrum kan en administratör sätta på väntrummet för a
 
 ## Förbered medlemmar
 
-Under Medlemmar → Förbered medlemmar kan en administratör lägga in namn, profilbild och arkivnamn för en vän innan hen har ett konto. Inget skickas ut. Förberedelsen kopplas till e-postadressen och används en gång, när en ny profil skapas för en inloggning med samma e-postadress. I Clerk-läget krävs att e-postadressen är verifierad. Därefter tas förberedelsen bort. Den går inte att göra för en e-postadress som redan tillhör en medlem.
+Under Medlemmar → Förbered medlemmar kan en administratör lägga in namn, profilbild och arkivnamn för en vän innan hen har ett konto. Inget skickas ut förrän administratören trycker Bjud in på den förberedda medlemmen (Clerk-läget), som skickar samma inbjudan som Medlemmar → Bjud in en medlem. Har adressen redan en väntande inbjudan står det Inbjuden i stället. Förberedelsen kopplas till e-postadressen och används en gång, när en ny profil skapas för en inloggning med samma e-postadress. I Clerk-läget krävs att e-postadressen är verifierad. Därefter tas förberedelsen bort. Den går inte att göra för en e-postadress som redan tillhör en medlem.
 
 ## Testläge för administratören
 
