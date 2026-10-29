@@ -14,7 +14,7 @@
 
 ## Väntrum
 
-Under Medlemmar → Väntrum kan en administratör sätta på väntrummet för att bjuda in medlemmar i förväg utan att släppa in dem. Medan det är på ser alla som inte är administratörer bara en väntsida: profilbilden för administratören som satte på det, texten "Den som väntar på nåt gott väntar aldrig för länge!" och ordmärket (loggan, Provningsklubben. och EST. 2019). Spärren sitter på servern i `requireMember`/`requireAdmin` (`lib/auth.ts`): alla andra API-anrop svarar 403, och `/api/avatar` lämnar bara ut den administratörens bild. Testpersoner i testläget påverkas inte. Inställningen ligger i tabellen `settings` (nyckeln `waiting_room`, värdet är administratörens id). "Öppna klubben" tar bort den.
+Under Medlemmar → Väntrum kan en administratör sätta på väntrummet för att bjuda in medlemmar i förväg utan att släppa in dem. Medan det är på ser alla som inte är administratörer bara en väntsida: profilbilden för administratören som satte på det, texten "Den som väntar på nåt gott väntar aldrig för länge!" och ordmärket med EST. 2019 i en toppbanner som i appen. Spärren sitter på servern i `requireMember`/`requireAdmin` (`lib/auth.ts`): alla andra API-anrop svarar 403, och `/api/avatar` lämnar bara ut den administratörens bild. Testpersoner i testläget påverkas inte. Inställningen ligger i tabellen `settings` (nyckeln `waiting_room`, värdet är administratörens id). "Öppna klubben" tar bort den.
 
 ## Profiler
 
