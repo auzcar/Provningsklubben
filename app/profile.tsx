@@ -1,6 +1,6 @@
 'use client';
 import {useEffect,useRef,useState} from 'react';
-import {Camera,Trash2,Pencil,LoaderCircle,ChevronRight,Star,CalendarDays} from 'lucide-react';
+import {Camera,Trash2,Pencil,LoaderCircle,ChevronRight,Star,CalendarDays,LogOut} from 'lucide-react';
 import {api} from '@/lib/client-api';
 import {authHeaders} from '@/lib/client-auth';
 import type {Me} from './auth-gate';
@@ -35,7 +35,7 @@ export async function resize(file:File){
  return canvas.toDataURL('image/jpeg',.85);
 }
 
-export function Profile({user,me,openTasting,onSaved}:{user:string;me:Me;openTasting:(id:string)=>void;onSaved:(p:any)=>void}){
+export function Profile({user,me,openTasting,onSaved,signOut}:{user:string;me:Me;openTasting:(id:string)=>void;onSaved:(p:any)=>void;signOut?:()=>void}){
  const [data,setData]=useState<any>(null);const [error,setError]=useState('');const [editing,setEditing]=useState(false);const [name,setName]=useState('');const [bio,setBio]=useState('');const [swish,setSwish]=useState('');const [busy,setBusy]=useState(false);const [expanded,setExpanded]=useState('');const file=useRef<HTMLInputElement>(null);
  useEffect(()=>{api('/api/profile?user='+encodeURIComponent(user)).then(setData).catch(e=>setError(e.message));},[user]);
  const save=async(body:any)=>{setBusy(true);setError('');try{const d=await api('/api/profile',body);setData(d);setEditing(false);onSaved(d.profile);}catch(e:any){setError(e.message);}finally{setBusy(false);}};
@@ -49,7 +49,7 @@ export function Profile({user,me,openTasting,onSaved}:{user:string;me:Me;openTas
    <div className="profile-text">
     <div className="eyebrow">{p.admin?'ADMINISTRATÖR':'MEDLEM'}{p.own?' · DIN PROFIL':''}</div>
     {editing?<div className="profile-edit"><label className="field"><span>Namn</span><input value={name} maxLength={60} onChange={e=>setName(e.target.value)}/></label><label className="field"><span>Om mig</span><textarea rows={3} maxLength={600} value={bio} placeholder="Favoritdrycker, smakpreferenser…" onChange={e=>setBio(e.target.value)}/></label><label className="field"><span>Swishnummer</span><input inputMode="tel" value={swish} placeholder="070-123 45 67" onChange={e=>setSwish(e.target.value)}/><small className="muted">Visas bara för deltagarna i provningar där du är värd, så att de kan swisha sin andel.</small></label><div className="row"><button className="primary small" disabled={busy} onClick={()=>save({action:'update',name,bio,swish})}>Spara</button><button className="secondary small" onClick={()=>setEditing(false)}>Avbryt</button></div></div>
-    :<><h1>{p.name}</h1>{p.bio?<p className="intro">{p.bio}</p>:p.own&&<p className="intro">Berätta gärna lite om din smak.</p>}{p.own&&<button className="text-button" onClick={()=>{setName(p.name);setBio(p.bio);setSwish(p.swish||'');setEditing(true);}}><Pencil size={14}/>Redigera profil</button>}</>}
+    :<><h1>{p.name}</h1>{p.bio?<p className="intro">{p.bio}</p>:p.own&&<p className="intro">Berätta gärna lite om din smak.</p>}{p.own&&<div className="row"><button className="text-button" onClick={()=>{setName(p.name);setBio(p.bio);setSwish(p.swish||'');setEditing(true);}}><Pencil size={14}/>Redigera profil</button>{signOut&&!me.tester&&<button className="text-button" onClick={signOut}><LogOut size={14}/>Logga ut</button>}</div>}</>}
     {error&&<p className="inline-error">{error}</p>}
    </div>
   </section>
